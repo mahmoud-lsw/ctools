@@ -1,6 +1,49 @@
 #! /usr/bin/env python
 import gammalib
 
+def rotate(center, point, rot_angle):
+    raise NotImplementedError
+
+
+def compute_off_regions(on_region, ex_regions, pointing,
+                        steps_per_segment=10):
+    """
+    TODO: document method
+    Special case: only works for circles!
+    """
+    
+    off_regions = gammalib.GRegions()
+
+    region_dir = on_region.get_center()
+    radius = on_region.radius()
+    offset = region_dir.sky_dist(pointing)
+
+    # Approximate step size to step along the circle
+    # by two on_region radii    
+    large_step_size = 180 / math.pi * 2 * math.asin(radius/offset)
+
+    small_step_size = large_step_size / steps_per_segment
+
+    # Move around the circle
+    angle = large_step_size
+    while (angle < 360 - large_step_size):
+        test_dir = rotate(pointing, region_dir, angle)
+        test_circle = gammalib.GSkyCircle(test_dir, radius)
+
+        overlaps = False
+        for ex_region in ex_regions:
+            if test_circle.overlaps(ex_region):
+                overlaps = True 
+
+        if overlaps:
+            angle += small_step_size
+            continue
+        else:
+            off_regions.append(test_circle)
+            angle += large_step_size
+            
+    return off_regions
+
 class csspecgen(gammalib.GApplication):
     """
     TODO: document csspecgen tool.
@@ -43,7 +86,7 @@ class csspecgen(gammalib.GApplication):
         self.m_outphaprefix = self["outphaprefix"].filename()
         self.m_outregfile = self["outregfile"].filename()
 
-        self.m_obs = gammalib.GCTAObservations()
+        self.m_obs = gammalib.GObservations()
         # Try first to open as FITS file
         try:
             # Load event list in CTA observation
@@ -93,10 +136,10 @@ class csspecgen(gammalib.GApplication):
             self.log.header1("Input")
 
 
-        self.m_on_region = gammalib.GRegions.load(self.m_onregfile)
-        self.log(str(self.m_on_region))
+        on_region = gammalib.GRegions.load(self.m_onregfile)
+        self.log(str(on_region))
 
-        self.m_exclusion_regions = gammalib.GRegions.load(self.m_exregfile)
+        ex_regions = gammalib.GRegions.load(self.m_exregfile)
 
         # m_obs has been set in get_parameters already
 
@@ -105,14 +148,26 @@ class csspecgen(gammalib.GApplication):
         emax = gammalib.GEnergy(m_emax, "TeV");
         self.m_ebds = gammalib.GEbounds(m_enumbins, emin, emax);
         
-        self.m_onoff_obs = gammalib.GCTAOnOffObservations(self.m_obs, self.m_ebds)
+        self.m_onoff_obs = gammalib.GCTAOnOffObservations()
         
-        for spec in self.m_onoff_obs.spectra:
-            # spec is a GCTAOnOffSpectrum
-            spec.set_on_region(self.m_on_region)
-            spec.set_exclusion_regions(self.m_exclusion_regions)
-            spec.compute_off_regions()
-            spec.fill_spectra() # fills n_on, n_off
+        for obs in self.m_obs:
+            # obs is a GCTAObservation
+
+            on_off_obs.exclusion_regions = self.m_exclusion_regions
+            on_off_obs.ebounds = self.m_ebds
+
+            pointing = obs.pointing()
+            off_regions = compute_off_regions(on_region, ex_regions, pointing)
+
+            on_off_obs = GCTAOnOffObservation(on_region, off_regions)
+
+            on_off_obs.fill_events(obs)
+
+            #on_off_obs.a_on = fill_constant(1)
+            #on_off_obs.n_off = fill(len(off_regions))
+            
+            self.m_onoff_obs.append(on_off_obs)
+
 
 if __name__ == '__main__':
     # Create instance of application
