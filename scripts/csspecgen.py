@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 import gammalib
 
+
 def rotate(center, point, rot_angle):
     raise NotImplementedError
 
@@ -11,7 +12,7 @@ def compute_off_regions(on_region, ex_regions, pointing,
     TODO: document method
     Special case: only works for circles!
     """
-    
+
     off_regions = gammalib.GRegions()
 
     region_dir = on_region.get_center()
@@ -19,7 +20,7 @@ def compute_off_regions(on_region, ex_regions, pointing,
     offset = region_dir.sky_dist(pointing)
 
     # Approximate step size to step along the circle
-    # by two on_region radii    
+    # by two on_region radii
     large_step_size = 180 / math.pi * 2 * math.asin(radius/offset)
 
     small_step_size = large_step_size / steps_per_segment
@@ -33,7 +34,7 @@ def compute_off_regions(on_region, ex_regions, pointing,
         overlaps = False
         for ex_region in ex_regions:
             if test_circle.overlaps(ex_region):
-                overlaps = True 
+                overlaps = True
 
         if overlaps:
             angle += small_step_size
@@ -41,8 +42,9 @@ def compute_off_regions(on_region, ex_regions, pointing,
         else:
             off_regions.append(test_circle)
             angle += large_step_size
-            
+
     return off_regions
+
 
 class csspecgen(gammalib.GApplication):
     """
@@ -51,10 +53,10 @@ class csspecgen(gammalib.GApplication):
     def __init__(self, *argv):
         self.name = "csspecgen"
         self.version = "0.1.0"
-        
+
         # Initialise some members
         self.m_obs = None
-        
+
         # Make sure that parfile exists
         file = self.parfile()
 
@@ -69,12 +71,12 @@ class csspecgen(gammalib.GApplication):
         # Set logger properties
         self.log_header()
         self.log.date(True)
-    
+
     def __del__(self):
         #  Write separator into logger
         if self.logTerse():
             self.log("\n")
-        
+
     def get_parameters(self):
         """
         Get parameters from parfile and setup the observation.
@@ -91,11 +93,11 @@ class csspecgen(gammalib.GApplication):
         try:
             # Load event list in CTA observation
             obs = gammalib.GCTAObservation()
-            obs.load_unbinned(m_evfile);
-            m_obs.append(obs);
+            obs.load_unbinned(m_evfile)
+            m_obs.append(obs)
         except gammalib.GException.fits_open_error:
             # Load observations from XML file
-            m_obs.load(m_evfile);
+            m_obs.load(m_evfile)
 
         self.m_emin = self["emin"].real()
         self.m_emax = self["emax"].real()
@@ -104,9 +106,9 @@ class csspecgen(gammalib.GApplication):
         # Set some fixed parameters
         self.m_log = False  # Logging in client tools
         self.m_debug = False  # Debugging in client tools
-        
+
     def execute(self):
-        self.run()        
+        self.run()
         self.m_onoff_obs.save_regions(self.m_outregfile)
         self.m_onoff_obs.save_pha(self.m_outphaprefix)
 
@@ -117,12 +119,12 @@ class csspecgen(gammalib.GApplication):
 
         # Get parameters
         self.get_parameters()
-        
+
         #  Write input parameters into logger
         if self.logTerse():
             self.log_parameters()
             self.log("\n")
-        
+
         # Write observation into logger
         if self.logTerse():
             self.log("\n")
@@ -135,7 +137,6 @@ class csspecgen(gammalib.GApplication):
             self.log("\n")
             self.log.header1("Input")
 
-
         on_region = gammalib.GRegions.load(self.m_onregfile)
         self.log(str(on_region))
 
@@ -144,12 +145,12 @@ class csspecgen(gammalib.GApplication):
         # m_obs has been set in get_parameters already
 
         # Setup energy range covered by data
-        emin = gammlib.GEnergy(m_emin, "TeV");
-        emax = gammalib.GEnergy(m_emax, "TeV");
-        self.m_ebds = gammalib.GEbounds(m_enumbins, emin, emax);
-        
+        emin = gammalib.GEnergy(m_emin, "TeV")
+        emax = gammalib.GEnergy(m_emax, "TeV")
+        self.m_ebds = gammalib.GEbounds(m_enumbins, emin, emax)
+
         self.m_onoff_obs = gammalib.GCTAOnOffObservations()
-        
+
         for obs in self.m_obs:
             # obs is a GCTAObservation
 
@@ -163,18 +164,18 @@ class csspecgen(gammalib.GApplication):
 
             on_off_obs.fill_events(obs)
 
-            #on_off_obs.a_on = fill_constant(1)
-            #on_off_obs.n_off = fill(len(off_regions))
-            
+            # on_off_obs.a_on = fill_constant(1)
+            # on_off_obs.n_off = fill(len(off_regions))
+
             self.m_onoff_obs.append(on_off_obs)
 
 
 if __name__ == '__main__':
     # Create instance of application
     app = csspecgen(sys.argv)
-    
+
     # Open logfile
     app.logFileOpen()
-    
+
     # Execute application
     app.execute()
