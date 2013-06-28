@@ -3,12 +3,15 @@ import gammalib
 
 
 def rotate(center, point, rot_angle):
+     # TODO: **********
     raise NotImplementedError
 
 
 def compute_off_regions(on_region, ex_regions, pointing,
                         steps_per_segment=10):
     """
+    Compute off regions for a circular on region.
+    
     TODO: document method
     Special case: only works for circles!
     """
@@ -38,7 +41,6 @@ def compute_off_regions(on_region, ex_regions, pointing,
 
         if overlaps:
             angle += small_step_size
-            continue
         else:
             off_regions.append(test_circle)
             angle += large_step_size
@@ -85,8 +87,8 @@ class csspecgen(gammalib.GApplication):
         self.m_evfile = self["evfile"].filename()
         self.m_onregfile = self["onregfile"].filename()
         self.m_exregfile = self["exregfile"].filename()
-        self.m_outphaprefix = self["outphaprefix"].filename()
-        self.m_outregfile = self["outregfile"].filename()
+        self.m_outprefix = self["outprefix"].filename()
+        self.m_outxmlfile = self["outxmlfile"].filename()
 
         self.m_obs = gammalib.GObservations()
         # Try first to open as FITS file
@@ -109,8 +111,19 @@ class csspecgen(gammalib.GApplication):
 
     def execute(self):
         self.run()
-        self.m_onoff_obs.save_regions(self.m_outregfile)
-        self.m_onoff_obs.save_pha(self.m_outphaprefix)
+        
+        self.m_onoff_obs.save(self.m_outxmlfile)
+        
+        for obs in self.m_onoff_obs:
+            prefix = '{0}_run{1:06d}_'.format(self.m_outprefix, obs.id)
+            obs.on_regions.save(prefix + 'on_regions.reg')
+            obs.off_regions.save(prefix + 'off_regions.reg')
+
+            obs.on_spec.save(prefix + 'on_spec.fits')
+            obs.off_spec.save(prefix + 'off_spec.fits')
+
+            obs.arf.save(prefix + 'arf.fits')
+            obs.rmf.save(prefix + 'rmf.fits')
 
     def run(self):
         # Switch screen logging on in debug mode
@@ -137,35 +150,30 @@ class csspecgen(gammalib.GApplication):
             self.log("\n")
             self.log.header1("Input")
 
-        on_region = gammalib.GRegions.load(self.m_onregfile)
+        on_region = gammalib.GRegions(self.m_onregfile)
         self.log(str(on_region))
 
-        ex_regions = gammalib.GRegions.load(self.m_exregfile)
-
-        # m_obs has been set in get_parameters already
+        ex_regions = gammalib.GRegions(self.m_exregfile)
 
         # Setup energy range covered by data
         emin = gammalib.GEnergy(m_emin, "TeV")
         emax = gammalib.GEnergy(m_emax, "TeV")
-        self.m_ebds = gammalib.GEbounds(m_enumbins, emin, emax)
+        ebounds = gammalib.GEbounds(m_enumbins, emin, emax)
 
         self.m_onoff_obs = gammalib.GCTAOnOffObservations()
 
         for obs in self.m_obs:
             # obs is a GCTAObservation
 
-            on_off_obs.exclusion_regions = self.m_exclusion_regions
-            on_off_obs.ebounds = self.m_ebds
+            on_off_obs = GCTAOnOffObservation(ebounds, on_region, off_regions)
 
             pointing = obs.pointing()
             off_regions = compute_off_regions(on_region, ex_regions, pointing)
+            on_off_obs.off_regions(off_regions)
 
-            on_off_obs = GCTAOnOffObservation(on_region, off_regions)
+            on_off_obs.fill(obs)
 
-            on_off_obs.fill_events(obs)
-
-            # on_off_obs.a_on = fill_constant(1)
-            # on_off_obs.n_off = fill(len(off_regions))
+            on_off_obs.compute_response()
 
             self.m_onoff_obs.append(on_off_obs)
 

@@ -20,8 +20,8 @@
 evfile,  f, a, "",,,"Input event list or observation definition file"
 onregfile, f, a, "on_region.reg",,, "On region file"
 exregfile, f, a, "exclusions.reg",,, "Exclusion region file"
-outphaprefix, f, a, "pha_",,, "Output PHA file prefix"
-outregfile, f, a, "reg.xml",,, "Output region file"
+outprefix, f, a, "obs_",,, "Output file prefix"
+outxmlfile, f, a, "reg.xml",,, "Output XML file"
 
 #
 # Energy binning parameters
