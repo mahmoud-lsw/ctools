@@ -3,8 +3,15 @@ import gammalib
 
 
 def rotate(center, point, rot_angle):
-     # TODO: **********
-    raise NotImplementedError
+    """Rotate point clockwise around center by rot_angle (deg)"""
+    offset = center.dist_deg(point)
+    pos_angle = center.posang_deg(point)
+    phi = rot_angle + pos_angle
+
+    new_point = center.copy()
+    new_point.rotate_deg(phi, offset)
+
+    return new_point
 
 
 def compute_off_regions(on_region, ex_regions, pointing,
