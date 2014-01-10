@@ -206,9 +206,9 @@ def make_files(filename, prfname, bkgname):
 		# Compute control background rate (this only works for KB files
 		# as they are for 80% containment radius). But we don't use this
 		# anyways, it's just for control on display ...
-		omega = 2.0 * math.pi * (1.0 - math.cos(math.radians(r80)))
-		if omega > 0.0:
-			bkg_rate2 = bgd / omega / ewidth
+		solidangle = 2.0 * math.pi * (1.0 - math.cos(math.radians(r80)))
+		if solidangle > 0.0:
+			bkg_rate2 = bgd / solidangle / ewidth
 		else:
 			bkg_rate2 = 0.0
 		

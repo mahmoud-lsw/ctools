@@ -66,10 +66,10 @@ def make_file_function(irfname, filename):
 		ewidth = emax-emin
 		
 		# Compute solid angle of r80 region in sr
-		omega = 2.0 * math.pi * (1.0 - math.cos(math.radians(r80)))
+		solidangle = 2.0 * math.pi * (1.0 - math.cos(math.radians(r80)))
 		
 		# Compute background rate per steradian and MeV
-		bkg_rate = bgd/omega/ewidth
+		bkg_rate = bgd/solidangle/ewidth
 
 		# Write
 		file.write(str(energy)+" "+str(bkg_rate)+"\n")
