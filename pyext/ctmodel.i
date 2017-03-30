@@ -1,7 +1,7 @@
 /***************************************************************************
- *                     ctmodel - CTA counts model tool                     *
+ *                  ctmodel - Model cube generation tool                   *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2012 by Juergen Knoedlseder                              *
+ *  copyright (C) 2012-2016 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,45 +20,42 @@
  ***************************************************************************/
 /**
  * @file ctmodel.i
- * @brief CTA counts model tool definition
+ * @brief Model cube generation tool definition
  * @author Juergen Knoedlseder
  */
 %{
 /* Put headers and other declarations here that are needed for compilation */
 #include "ctmodel.hpp"
-#include "GTools.hpp"
 %}
 
 
 /***********************************************************************//**
  * @class ctmodel
  *
- * @brief CTA counts model tool interface defintion
+ * @brief Model cube generation tool
  ***************************************************************************/
-class ctmodel : public GApplication  {
-
+class ctmodel : public ctobservation {
 public:
     // Constructors and destructors
     ctmodel(void);
-    explicit ctmodel(GObservations obs);
+    explicit ctmodel(const GObservations& obs);
     ctmodel(int argc, char *argv[]);
     ctmodel(const ctmodel& app);
     virtual ~ctmodel(void);
 
     // Methods
-    void           clear(void);
-    void           execute(void);
-    void           run(void);
-    void           save(void);
-    GObservations& obs(void) { return m_obs; }
-    void           get_parameters(void);
-    void           setup_obs(void);
-    void           model_map(GCTAObservation* obs, const GModels& models);
+    void                 clear(void);
+    void                 run(void);
+    void                 save(void);
+    void                 publish(const std::string& name = "");
+    const GCTAEventCube& cube(void) const;
+    void                 cube(const GCTAEventCube& cube);
+    void                 models(const GModels& models);
 };
 
 
 /***********************************************************************//**
- * @brief CTA counts model tool Python extension
+ * @brief Model cube generation tool Python extension
  ***************************************************************************/
 %extend ctmodel {
     ctmodel copy() {

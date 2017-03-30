@@ -1,7 +1,7 @@
 /***************************************************************************
  *                     ctmodel - CTA counts model tool                     *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2012 by Juergen Knoedlseder                              *
+ *  copyright (C) 2012-2016 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -19,7 +19,7 @@
  *                                                                         *
  ***************************************************************************/
 /**
- * @file main.cpp
+ * @file ctmodel/main.cpp
  * @brief CTA counts model tool main code
  * @author Juergen Knoedlseder
  */
@@ -28,7 +28,7 @@
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#include <cstdio>
+#include "support.hpp"
 #include "ctmodel.hpp"
 
 
@@ -38,41 +38,39 @@
  * @param[in] argc Number of command line arguments.
  * @param[in] argv Command line arguments.
  *
- * This is the main entry point of the gtbin application. It allocates a
- * ctmodel object and runs the application.
+ * This is the main entry point of the ctmodel application. It allocates a
+ * ctmodel object and executes the application. Any exceptions that occur
+ * will be catched and corresponding error messages written in the
+ * application logger and into the standard output.
  ***************************************************************************/
 int main (int argc, char *argv[])
 {
     // Initialise return code
     int rc = 1;
 
-    // Create instance of application
-    ctmodel application(argc, argv);
+    // Initialise pointer on application
+    ctmodel* application = NULL;
 
-    // Run application
+    // Execute application
     try {
-        // Execute application
-        application.execute();
 
-        // Signal success
-        rc = 0;
+        // Create instance of application
+        application = new ctmodel(argc, argv);
+
+        // Execute ctool
+        rc = execute_ctool(application);
+
     }
+
     catch (std::exception &e) {
 
-        // Extract error message
-        std::string message = e.what();
-        std::string signal  = "*** ERROR encounterted in the execution of"
-                              " ctmodel. Run aborted ...";
+        // Report exception
+        report_ctool_failure("ctmodel", e.what());
 
-        // Write error in logger
-        application.log << signal  << std::endl;
-        application.log << message << std::endl;
+    }
 
-        // Write error on standard output
-        std::cout << signal  << std::endl;
-        std::cout << message << std::endl;
-
-    } // endcatch: catched any application error
+    // Delete application
+    delete application;
 
     // Return
     return rc;

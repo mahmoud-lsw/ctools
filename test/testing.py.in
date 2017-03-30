@@ -1,0 +1,166 @@
+# ==========================================================================
+# Python base class for unit tests
+#
+# Copyright (C) 2016 Juergen Knoedlseder
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# ==========================================================================
+import os
+import gammalib
+
+
+# ================================ #
+# Python base class for unit tests #
+# ================================ #
+class test(gammalib.GPythonTestSuite):
+    """
+    Python base class for unit tests
+    """
+
+    # Constructor
+    def __init__(self):
+        """
+        Constructor
+        """
+        # Call base class constructor
+        gammalib.GPythonTestSuite.__init__(self)
+
+        # Set test data directory
+        self._datadir = os.environ['TEST_DATA']
+
+        # Set some standard test data (additional test data will be set in
+        # the derived classes as needed)
+        self._events  = self._datadir + '/crab_events.fits'
+        self._cntcube = self._datadir + '/crab_cntmap.fits'
+        self._model   = self._datadir + '/crab.xml'
+        self._caldb   = 'prod2'
+        self._irf     = 'South_0.5h'
+
+        # Return
+        return
+
+    # Set script name
+    def _script(self, name):
+        """
+        Set script name
+        """
+        # Set script name dependent on whether the software is installed or
+        # not. If the software is not installed the 'TEST_BUILDDIR' environment
+        # variable will exist
+        if 'TEST_BUILDDIR' in os.environ:
+            script = '@PYTHON_COVERAGE@' + os.environ['TEST_BUILDDIR'] + \
+                     '/cscripts/'+name+'.py'
+        else:
+            script = name
+
+        # Return script name
+        return script
+
+    # Set tool name
+    def _tool(self, name):
+        """
+        Set tool name
+        """
+        # Set tool name dependent on whether the software is installed or
+        # not. If the software is not installed the 'TEST_BUILDDIR' environment
+        # variable will exist
+        if 'TEST_BUILDDIR' in os.environ:
+            tool = os.environ['TEST_BUILDDIR'] + '/src/'+name+'/'+name
+        else:
+            tool = name
+
+        # Return tool name
+        return tool
+
+    # Execute command and catch any exception
+    def _execute(self, cmd):
+        """
+        Execute command
+        """
+        # Execute command, make sure we catch any exception
+        try:
+            rc = os.system(cmd+' >/dev/null 2>&1')
+        except:
+            rc = -1
+
+        # Return return code
+        return rc
+
+    # Return observation container with 3 identical event lists
+    def _obs_events(self):
+        """
+        Return observation container with 3 identical event lists
+
+        Returns
+        -------
+        obs : `~gammalib.gammalib.GObservations`
+            Observations container
+        """
+        # Load CTA event list
+        cta = gammalib.GCTAObservation(self._events)
+
+        # Allocate observation container
+        obs = gammalib.GObservations()
+
+        # Append CTA observation with ID "0001"
+        cta.id('0001')
+        obs.append(cta)
+
+        # Append CTA observation with ID "0002"
+        cta.id('0002')
+        obs.append(cta)
+
+        # Append CTA observation with ID "0003"
+        cta.id('0003')
+        obs.append(cta)
+
+        # Return observation container
+        return obs
+
+    # Return observation container with event list, counts cube and LAT
+    # observation
+    def _obs_mixed(self):
+        """
+        Return observation container with event list, counts cube and LAT
+        observation
+
+        Returns
+        -------
+        obs : `~gammalib.gammalib.GObservations`
+            Observations container
+        """
+        # Load CTA event list
+        obs1 = gammalib.GCTAObservation(self._events)
+        obs1.id('0001')
+
+        # Load CTA counts cube
+        obs2 = gammalib.GCTAObservation(self._cntcube)
+        obs2.id('0002')
+
+        # Create empty LAT observation
+        obs3 = gammalib.GLATObservation()
+        obs3.id('0001')
+        obs3.events(gammalib.GLATEventList())
+
+        # Allocate observation container
+        obs = gammalib.GObservations()
+
+        # Append observations to container
+        obs.append(obs1)
+        obs.append(obs2)
+        obs.append(obs3)
+
+        # Return observation container
+        return obs

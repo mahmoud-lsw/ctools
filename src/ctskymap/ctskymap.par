@@ -5,11 +5,10 @@
 # ------------------------------------------------------------------------- #
 #                                                                           #
 #  File:      ctskymap.par                                                  #
-#  Version:   00-01-00                                                      #
 #                                                                           #
-#  Author:    Jurgen Knodlseder                                             #
-#             knodlseder@cesr.fr                                            #
-#             IRAP                                                          #
+#  Author:    Juergen Knoedlseder                                           #
+#             jknodlseder@irap.omp.eu                                       #
+#             IRAP, Toulouse, France                                        #
 #                                                                           #
 #  Purpose:   Parameter file for the ctskymap application                   #
 #                                                                           #
@@ -17,29 +16,40 @@
 #
 # General parameters
 #===================
-evfile,  f, a, "test/data/crab_events.fits.gz",,,"Event data file name"
-outfile, f, a, "skymap.fits",,, "Output file name"
+inobs,  f, a, "events.fits",,, "Input event list or observation definition XML file"
+caldb,  s, a, "prod2",,, "Calibration database"
+irf,    s, a, "South_0.5h",,, "Instrument response function"
+outmap, f, a, "skymap.fits",,, "Output skymap file"
+
 #
 # Event selection parameters
 #===========================
-emin,     r, a,   0.1,,,"Minimum energy in TeV"
-emax,     r, a, 100.0,,,"Maximum energy in TeV"
+emin, r, a, 0.1,,, "Lower energy limit (TeV)"
+emax, r, a, 100.0,,, "Upper energy limit (TeV)"
+
 #
 # Spatial binning parameters
 #===========================
+usepnt,   b, h, no,,, "Use pointing instead of xref/yref parameters?"
 nxpix,    i, a, 200,,, "Size of the X axis in pixels"
 nypix,    i, a, 200,,, "Size of the Y axis in pixels"
 binsz,    r, a, 0.02,,, "Image scale (in degrees/pixel)"
-coordsys, s, a, "CEL", CEL|GAL,,"Coordinate system (CEL - celestial, GAL - galactic)"
-xref,     r, a, 83.63,,, "First coordinate of image center in degrees (RA or galactic l)"
-yref,     r, a, 22.01,,, "Second coordinate of image center in degrees (DEC or galactic b)"
-axisrot,  r, h, 0.0,,, "Rotation angle of image axis, in degrees"
-proj,     s, a, "CAR",,, "Projection method e.g. AIT|ARC|CAR|GLS|MER|NCP|SIN|STG|TAN"
+coordsys, s, a, CEL, CEL|GAL,,"Coordinate system (CEL - celestial, GAL - galactic)"
+proj,     s, a, CAR, AIT|AZP|CAR|MER|MOL|STG|TAN,, "Projection method"
+xref,     r, a, 83.63,0,360, "First coordinate of image center in degrees (RA or galactic l)"
+yref,     r, a, 22.01,-90,90, "Second coordinate of image center in degrees (DEC or galactic b)"
+
+#
+# Background subtraction parameters
+#==================================
+bkgsubtract, s, a, NONE, NONE|IRF,, "Background subtraction method"
 
 #
 # Standard parameters
 #====================
-chatter, i, h, 1,0,4, "Chattiness of output"
+publish, b, h, no,,, "Publish sky map on VO Hub?"
+chatter, i, h, 2,0,4, "Chattiness of output"
 clobber, b, h, yes,,, "Overwrite existing output files with new output files?"
 debug,   b, h, no,,, "Debugging mode activated"
 mode,    s, h, "ql",,, "Mode of automatic parameters"
+logfile, f, h, "ctskymap.log",,, "Log filename"

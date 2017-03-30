@@ -1,7 +1,7 @@
 /***************************************************************************
- *                     ctskymap - CTA sky mapping tool                     *
+ *                       ctskymap - Sky mapping tool                       *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2011-2013 by Juergen Knoedlseder                         *
+ *  copyright (C) 2011-2017 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,7 +20,7 @@
  ***************************************************************************/
 /**
  * @file ctskymap.cpp
- * @brief CTA sky mapping tool implementation
+ * @brief Sky mapping tool implementation
  * @author Juergen Knoedlseder
  */
 
@@ -30,11 +30,11 @@
 #endif
 #include <cstdio>
 #include "ctskymap.hpp"
-#include "GTools.hpp"
 
 /* __ Method name definitions ____________________________________________ */
 #define G_INIT_MAP                 "ctskymap::init_map(GCTAObservation* obs)"
 #define G_BIN_EVENTS                 "ctskymap::bin_events(GCTAObservation*)"
+#define G_BKG_SUBTRACT_IRF     "ctskymap::bkg_subtract_irf(GCTAObservation*)"
 
 /* __ Debug definitions __________________________________________________ */
 
@@ -49,14 +49,13 @@
 
 /***********************************************************************//**
  * @brief Void constructor
+ *
+ * Constructs an empty sky mapping tool.
  ***************************************************************************/
-ctskymap::ctskymap(void) : GApplication(CTSKYMAP_NAME, CTSKYMAP_VERSION)
+ctskymap::ctskymap(void) : ctobservation(CTSKYMAP_NAME, CTSKYMAP_VERSION)
 {
     // Initialise members
     init_members();
-
-    // Write header into logger
-    log_header();
 
     // Return
     return;
@@ -66,19 +65,15 @@ ctskymap::ctskymap(void) : GApplication(CTSKYMAP_NAME, CTSKYMAP_VERSION)
 /***********************************************************************//**
  * @brief Observations constructor
  *
- * This method creates an instance of the class by copying an existing
- * observations container.
+ * param[in] obs Observation container.
+ *
+ * Constructs sky mapping tool from an observation container.
  ***************************************************************************/
-ctskymap::ctskymap(GObservations obs) : GApplication(CTSKYMAP_NAME, CTSKYMAP_VERSION)
+ctskymap::ctskymap(const GObservations& obs) :
+          ctobservation(CTSKYMAP_NAME, CTSKYMAP_VERSION, obs)
 {
     // Initialise members
     init_members();
-
-    // Set observations
-    m_obs = obs;
-
-    // Write header into logger
-    log_header();
 
     // Return
     return;
@@ -91,15 +86,15 @@ ctskymap::ctskymap(GObservations obs) : GApplication(CTSKYMAP_NAME, CTSKYMAP_VER
  *
  * @param[in] argc Number of arguments in command line.
  * @param[in] argv Array of command line arguments.
+ *
+ * Constructs sky mapping tool using command line arguments for user
+ * parameter setting.
  ***************************************************************************/
 ctskymap::ctskymap(int argc, char *argv[]) : 
-                    GApplication(CTSKYMAP_NAME, CTSKYMAP_VERSION, argc, argv)
+          ctobservation(CTSKYMAP_NAME, CTSKYMAP_VERSION, argc, argv)
 {
     // Initialise members
     init_members();
-
-    // Write header into logger
-    log_header();
 
     // Return
     return;
@@ -109,9 +104,9 @@ ctskymap::ctskymap(int argc, char *argv[]) :
 /***********************************************************************//**
  * @brief Copy constructor
  *
- * @param[in] app Application.
+ * @param[in] app Sky mapping tool.
  ***************************************************************************/
-ctskymap::ctskymap(const ctskymap& app) : GApplication(app)
+ctskymap::ctskymap(const ctskymap& app) : ctobservation(app)
 {
     // Initialise members
     init_members();
@@ -146,15 +141,16 @@ ctskymap::~ctskymap(void)
 /***********************************************************************//**
  * @brief Assignment operator
  *
- * @param[in] app Application.
+ * @param[in] app Sky mapping tool.
+ * @return Sky mapping tool.
  ***************************************************************************/
-ctskymap& ctskymap::operator= (const ctskymap& app)
+ctskymap& ctskymap::operator=(const ctskymap& app)
 {
     // Execute only if object is not identical
     if (this != &app) {
 
         // Copy base class members
-        this->GApplication::operator=(app);
+        this->ctobservation::operator=(app);
 
         // Free members
         free_members();
@@ -179,39 +175,27 @@ ctskymap& ctskymap::operator= (const ctskymap& app)
  ==========================================================================*/
 
 /***********************************************************************//**
- * @brief Clear instance
+ * @brief Clear sky mapping tool
+ *
+ * Clears sky mapping tool.
  ***************************************************************************/
 void ctskymap::clear(void)
 {
     // Free members
     free_members();
-    this->GApplication::free_members();
+    this->ctool::free_members();
+    this->ctobservation::free_members();
+
+    // Clear base class (needed to conserve tool name and version)
+    this->GApplication::clear();
 
     // Initialise members
-    this->GApplication::init_members();
+    this->ctool::init_members();
+    this->ctobservation::init_members();
     init_members();
 
-    // Return
-    return;
-}
-
-
-/***********************************************************************//**
- * @brief Execute application
- *
- * This method creates the sky map and saves the map into a FITS file.
- ***************************************************************************/
-void ctskymap::execute(void)
-{
-    // Read ahead output filename so that it gets dumped correctly in the
-    // parameters log
-    m_outfile = (*this)["outfile"].filename();
-
-    // Create the sky map
-    run();
-
-    // Save the sky map into FITS file
-    save();
+    // Write header into logger
+    log_header();
 
     // Return
     return;
@@ -219,18 +203,14 @@ void ctskymap::execute(void)
 
 
 /***********************************************************************//**
- * @brief Creates sky maps from data
+ * @brief Run the sky mapping tool
  *
- * This method is the main code. It
- * (1) reads task parameters from the par file
- * (2) initialises the sky maps
- * (3) loops over all observations to add its events to the sky map
+ * Generates a sky map from event list by looping over all unbinned CTA
+ * observation in the observation container and filling all events into
+ * a sky map.
  ***************************************************************************/
 void ctskymap::run(void)
 {
-    // Initialise statistics
-    int num_obs = 0;
-
     // Switch screen logging on in debug mode
     if (logDebug()) {
         log.cout(true);
@@ -239,83 +219,43 @@ void ctskymap::run(void)
     // Get parameters
     get_parameters();
 
-    // Write parameters into logger
-    if (logTerse()) {
-        log_parameters();
-        log << std::endl;
-    }
+    // Write input observation container into logger
+    log_observations(NORMAL, m_obs, "Input observation");
 
-    // Write observation(s) into logger
-    if (logTerse()) {
-        log << std::endl;
-        if (m_obs.size() > 1) {
-            log.header1("Observations");
-        }
-        else {
-            log.header1("Observation");
-        }
-        log << m_obs << std::endl;
-    }
+    // Write header into logger
+    log_header1(TERSE, gammalib::number("Map observation", m_obs.size()));
 
-    // Write header
-    if (logTerse()) {
-        log << std::endl;
-        if (m_obs.size() > 1) {
-            log.header1("Map observations");
-        }
-        else {
-            log.header1("Map observation");
-        }
-    }
+    // Loop over all unbinned CTA observations in the container
+    for (GCTAObservation* obs = first_unbinned_observation(); obs != NULL;
+         obs = next_unbinned_observation()) {
 
-    // Loop over all observation in the container
-    for (int i = 0; i < m_obs.size(); ++i) {
+        // Map events into sky map
+        map_events(obs);
 
-        // Get CTA observation
-        GCTAObservation* obs = dynamic_cast<GCTAObservation*>(m_obs[i]);
+        // Compute background sky map
+        map_background(obs);
 
-        // Continue only if observation is a CTA observation
-        if (obs != NULL) {
-
-            // Write header for current observation
-            if (logTerse()) {
-                if (obs->name().length() > 1) {
-                    log.header3("Observation "+obs->name());
-                }
-                else {
-                    log.header3("Observation");
-                }
-            }
-
-            // If this is the first valid observation we're working on
-            // then initialise the sky maps
-            if (num_obs == 0) {
-                init_map(obs);
-            }
-
-            // Map events into sky map
-            map_events(obs);
-            
-            // Increment observation counter
-            num_obs++;
-
-        } // endif: CTA observation found
+        // Dispose events to free memory
+        obs->dispose_events();
 
     } // endfor: looped over observations
 
-    // Write observation(s) into logger
-/*
-    if (logTerse()) {
-        log << std::endl;
-        if (m_obs.size() > 1) {
-            log.header1("Map observations");
-        }
-        else {
-            log.header1("Map observation");
-        }
-        log << m_obs << std::endl;
+    // If background subtract was required then compute significance map
+    // and subtract background map from counts map
+    if (m_bkgsubtract != "NONE") {
+
+        // Compute significance map
+        m_sigmap = (m_skymap - m_bkgmap) / sqrt(m_skymap);
+
+        // Subtract background map from counts map
+        m_skymap -= m_bkgmap;
+
+    } // endif: background subtraction was requested
+
+    // Optionally publish sky map
+    if (m_publish) {
+        publish();
     }
-*/
 
     // Return
     return;
@@ -323,122 +263,57 @@ void ctskymap::run(void)
 
 
 /***********************************************************************//**
- * @brief Save observation
+ * @brief Save sky map
  *
- * This method saves the counts map(s) into (a) FITS file(s).
+ * Saves the sky map into a FITS file. The FITS file name is specified by the
+ * @p outname parameter.
  ***************************************************************************/
 void ctskymap::save(void)
 {
     // Write header
-    if (logTerse()) {
-        log << std::endl;
-        log.header1("Save sky map");
-    }
+    log_header1(TERSE, "Save sky map");
 
-    // Get output filename
-    m_outfile = (*this)["outfile"].filename();
+    // Get sky map filename
+    m_outmap  = (*this)["outmap"].filename();
 
-    // Save sky map
-    m_skymap.save(m_outfile, clobber());
+    // Save sky map if filename and the map are not empty
+    if (!m_outmap.is_empty() && !m_skymap.is_empty()) {
 
-    // Return
-    return;
-}
+        // Create empty FITS file
+        GFits fits;
 
+        // Write sky map into FITS file
+        m_skymap.write(fits);
 
-/***********************************************************************//**
- * @brief Get application parameters
- *
- * Get all task parameters from parameter file or (if required) by querying
- * the user. Most parameters are only required if no observation exists so
- * far in the observation container. In this case, a single CTA observation
- * will be added to the container, using the definition provided in the
- * parameter file.
- ***************************************************************************/
-void ctskymap::get_parameters(void)
-{
-    // If there are no observations in container then add a single CTA
-    // observation using the parameters from the parameter file
-    if (m_obs.size() == 0) {
-
-        // Get name of CTA events file
-        m_evfile = (*this)["evfile"].filename();
-
-        // Load unbinned CTA observation
-        GCTAObservation obs;
-        obs.load_unbinned(m_evfile);
-
-        // Append CTA observation to container
-        m_obs.append(obs);
+        // If background subtraction is requested then write background map
+        // and significance map to FITS file
+        if (m_bkgsubtract != "NONE") {
         
-        // Use the xref and yref parameters for binning (otherwise the
-        // pointing direction(s) is/are used)
-        m_xref = (*this)["xref"].real();
-        m_yref = (*this)["yref"].real();
+            // Write background map into FITS file
+            m_bkgmap.write(fits);
 
-    } // endif: there was no observation in the container
+            // Set background map extension name
+            fits[fits.size()-1]->extname("BACKGROUND");
 
-    // Get remaining parameters
-    m_emin     = (*this)["emin"].real();
-    m_emax     = (*this)["emax"].real();
-    m_proj     = (*this)["proj"].string();
-    m_coordsys = (*this)["coordsys"].string();
-    m_binsz    = (*this)["binsz"].real();
-    m_nxpix    = (*this)["nxpix"].integer();
-    m_nypix    = (*this)["nypix"].integer();
+            // Write significance map into FITS file
+            m_sigmap.write(fits);
 
-    // Return
-    return;
-}
+            // Set significance map extension name
+            fits[fits.size()-1]->extname("SIGNIFICANCE");
 
+        } // endif: background subtraction was requested
 
-/***********************************************************************//**
- * @brief Initialise sky map
- *
- * @param[in] obs CTA observation (no NULL pointer allowed).
- *
- * @exception GCTAException::no_pointing
- *            No valid CTA pointing found.
- *
- * This method initialises the sky map.
- ***************************************************************************/
-void ctskymap::init_map(GCTAObservation* obs)
-{
-    // Clear any existing sky map
-    m_skymap.clear();
-    
-    // Get map centre. If no centre is specified then extract the map centre
-    // from the pointing direction. This obviously only works for 
-    double xref;
-    double yref;
-    if (m_xref != 9999.0 && m_yref != 9999.0) {
-        xref = m_xref;
-        yref = m_yref;
+        // Save FITS file to disk
+        fits.saveto(m_outmap, clobber());
+
     }
-    else {
 
-
-        // Get pointer on CTA pointing
-        const GCTAPointing *pnt = obs->pointing();
-        if (pnt == NULL) {
-            throw GCTAException::no_pointing(G_INIT_MAP);
-        }
-            
-        // Set reference point to pointing
-        if (toupper(m_coordsys) == "GAL") {
-            xref = pnt->dir().l_deg();
-            yref = pnt->dir().b_deg();
-        }
-        else {
-            xref = pnt->dir().ra_deg();
-            yref = pnt->dir().dec_deg();
-        }
-
-    } // endelse: map centre set to pointing
-
-    // Create skymap
-    m_skymap = GSkymap(m_proj, m_coordsys, xref, yref, m_binsz, m_binsz,
-                       m_nxpix, m_nypix, 1);
+    // Write into logger what has been done
+    std::string fname = (m_outmap.is_empty()) ? "NONE" : m_outmap.url();
+    if (m_skymap.is_empty()) {
+        fname.append(" (map is empty, no file created)");
+    }
+    log_value(NORMAL, "Sky map file", fname);
 
     // Return
     return;
@@ -446,90 +321,26 @@ void ctskymap::init_map(GCTAObservation* obs)
 
 
 /***********************************************************************//**
- * @brief Map events into a sky map
+ * @brief Publish sky map
  *
- * @param[in] obs CTA observation.
- *
- * @exception GException::no_list
- *            No event list found in observation.
- * @exception GCTAException::no_pointing
- *            No valid CTA pointing found.
- *
- * This method maps the events found in a CTA events list into a sky map.
+ * @param[in] name Sky map name.
  ***************************************************************************/
-void ctskymap::map_events(GCTAObservation* obs)
+void ctskymap::publish(const std::string& name)
 {
-    // Continue only if observation pointer is valid
-    if (obs != NULL) {
+    // Write header into logger
+    log_header1(TERSE, "Publish sky map");
 
-        // Make sure that the observation holds a CTA event list. If this
-        // is not the case then throw an exception.
-        if (dynamic_cast<const GCTAEventList*>(obs->events()) == NULL) {
-            throw GException::no_list(G_BIN_EVENTS);
-        }
+    // Set default name if user name is empty
+    std::string user_name(name);
+    if (user_name.empty()) {
+        user_name = CTSKYMAP_NAME;
+    }
 
-        // Setup energy range covered by data
-        GEnergy  emin;
-        GEnergy  emax;
-        GEbounds ebds;
-        emin.TeV(m_emin);
-        emax.TeV(m_emax);
+    // Write sky map name into logger
+    log_value(NORMAL, "Sky map name", user_name);
 
-        // Initialise binning statistics
-        int num_outside_map    = 0;
-        int num_outside_erange = 0;
-        int num_in_map         = 0;
-
-        // Fill sky map
-        GCTAEventList* events = static_cast<GCTAEventList*>(const_cast<GEvents*>(obs->events()));
-        for (GCTAEventList::iterator event = events->begin(); event != events->end(); ++event) {
-
-            // Skip if energy is out of range
-            if (event->energy() < emin || event->energy() > emax) {
-                num_outside_erange++;
-                continue;
-            }
-
-            // Determine sky pixel
-            GCTAInstDir* inst  = (GCTAInstDir*)&(event->dir());
-            GSkyDir      dir   = inst->dir();
-            GSkyPixel    pixel = m_skymap.dir2xy(dir);
-
-            // Skip if pixel is out of range
-            if (pixel.x() < -0.5 || pixel.x() > (m_nxpix-0.5) ||
-                pixel.y() < -0.5 || pixel.y() > (m_nypix-0.5)) {
-                num_outside_map++;
-                continue;
-            }
-
-            // Fill event in skymap
-            m_skymap(pixel, 0) += 1.0;
-            num_in_map++;
-
-        } // endfor: looped over all events
-
-        // Log binning results
-        if (logTerse()) {
-            log << std::endl;
-            log.header1("Mapping");
-            log << parformat("Events in list");
-            log << obs->events()->size() << std::endl;
-            log << parformat("Events in map");
-            log << num_in_map << std::endl;
-            log << parformat("Events outside map area");
-            log << num_outside_map << std::endl;
-            log << parformat("Events outside energy range");
-            log << num_outside_erange << std::endl;
-        }
-
-        // Log map
-        if (logTerse()) {
-            log << std::endl;
-            log.header1("Sky map");
-            log << m_skymap << std::endl;
-        }
-
-    } // endif: observation was valid
+    // Publish sky map
+    m_skymap.publish(user_name);
 
     // Return
     return;
@@ -548,22 +359,14 @@ void ctskymap::map_events(GCTAObservation* obs)
 void ctskymap::init_members(void)
 {
     // Initialise members
-    m_evfile.clear();
-    m_outfile.clear();
-    m_proj.clear();
-    m_coordsys.clear();
-    m_obs.clear();
     m_skymap.clear();
-    m_emin     = 0.0;
-    m_emax     = 0.0;
-    m_xref     = 9999.0; // Flags unset (use pointing direction)
-    m_yref     = 9999.0; // Flags unset (use pointing direction)
-    m_binsz    = 0.0;
-    m_nxpix    = 0;
-    m_nypix    = 0;
-
-    // Set logger properties
-    log.date(true);
+    m_bkgmap.clear();
+    m_sigmap.clear();
+    m_emin        = 0.0;
+    m_emax        = 0.0;
+    m_bkgsubtract = "NONE";
+    m_publish     = false;
+    m_chatter     = static_cast<GChatter>(2);
 
     // Return
     return;
@@ -578,19 +381,14 @@ void ctskymap::init_members(void)
 void ctskymap::copy_members(const ctskymap& app)
 {
     // Copy attributes
-    m_evfile   = app.m_evfile;
-    m_outfile  = app.m_outfile;
-    m_proj     = app.m_proj;
-    m_coordsys = app.m_coordsys;
-    m_obs      = app.m_obs;
-    m_skymap   = app.m_skymap;
-    m_emin     = app.m_emin;
-    m_emax     = app.m_emax;
-    m_xref     = app.m_xref;
-    m_yref     = app.m_yref;
-    m_binsz    = app.m_binsz;
-    m_nxpix    = app.m_nxpix;
-    m_nypix    = app.m_nypix;
+    m_skymap      = app.m_skymap;
+    m_bkgmap      = app.m_bkgmap;
+    m_sigmap      = app.m_sigmap;
+    m_emin        = app.m_emin;
+    m_emax        = app.m_emax;
+    m_bkgsubtract = app.m_bkgsubtract;
+    m_publish     = app.m_publish;
+    m_chatter     = app.m_chatter;
 
     // Return
     return;
@@ -602,10 +400,295 @@ void ctskymap::copy_members(const ctskymap& app)
  ***************************************************************************/
 void ctskymap::free_members(void)
 {
-    // Write separator into logger
-    if (logTerse())
-        log << std::endl;
+    // Return
+    return;
+}
+
+
+/***********************************************************************//**
+ * @brief Get application parameters
+ *
+ * Get all task parameters from parameter file or (if required) by querying
+ * the user. Most parameters are only required if no observation exists so
+ * far in the observation container. In this case, a single CTA observation
+ * will be added to the container, using the definition provided in the
+ * parameter file.
+ ***************************************************************************/
+void ctskymap::get_parameters(void)
+{
+    // Setup observations from "inobs" parameter. Do not request response
+    // information and do not accept counts cubes.
+    setup_observations(m_obs, false, true, false);
+
+    // Create sky map based on task parameters
+    m_skymap = create_map(m_obs);
+
+    // Get further parameters
+    m_emin        = (*this)["emin"].real();
+    m_emax        = (*this)["emax"].real();
+    m_bkgsubtract = (*this)["bkgsubtract"].string();
+
+    // If IRF background subtraction is requested then make sure that the
+    // CTA observations in the observation container have response information
+    if (m_bkgsubtract == "IRF") {
+        set_response(m_obs);
+    }
+
+    // Get remaining parameters
+    m_publish     = (*this)["publish"].boolean();
+    m_chatter     = static_cast<GChatter>((*this)["chatter"].integer());
+
+    // Read ahead parameters
+    if (read_ahead()) {
+        m_outmap  = (*this)["outmap"].filename();
+    }
+
+    // Create background map and significance map if background subtraction
+    // is requested
+    if (m_bkgsubtract != "NONE") {
+        m_bkgmap = create_map(m_obs);
+        m_sigmap = create_map(m_obs);
+    }
+
+    // Write parameters into logger
+    log_parameters(TERSE);
 
     // Return
     return;
 }
+
+
+/***********************************************************************//**
+ * @brief Map events into a sky map
+ *
+ * @param[in] obs CTA observation.
+ *
+ * @exception GException::no_list
+ *            No event list found in observation.
+ *
+ * This method maps the events found in a CTA events list into a sky map.
+ ***************************************************************************/
+void ctskymap::map_events(GCTAObservation* obs)
+{
+    // Get non-const pointer on a CTA event list
+    GCTAEventList* events = dynamic_cast<GCTAEventList*>
+                            (const_cast<GEvents*>(obs->events()));
+
+    // Make sure that the observation holds a CTA event list. If this
+    // is not the case then throw an exception.
+    if (events == NULL) {
+        throw GException::no_list(G_BIN_EVENTS);
+    }
+
+    // Setup energy range covered by data
+    GEnergy  emin;
+    GEnergy  emax;
+    GEbounds ebds;
+    emin.TeV(m_emin);
+    emax.TeV(m_emax);
+
+    // Initialise binning statistics
+    int num_outside_roi    = 0;
+    int num_outside_map    = 0;
+    int num_outside_erange = 0;
+    int num_in_map         = 0;
+
+    // Extract region of interest from observation
+    GCTARoi roi = obs->roi();
+
+    // Fill sky map
+    for (int i = 0; i < events->size(); ++i) {
+
+        // Get event
+        GCTAEventAtom* event = (*events)[i];
+
+        // Skip if energy is out of range
+        if (event->energy() < emin || event->energy() > emax) {
+            num_outside_erange++;
+            continue;
+        }
+
+        // Determine sky pixel
+        GCTAInstDir* inst  = (GCTAInstDir*)&(event->dir());
+        GSkyDir      dir   = inst->dir();
+        GSkyPixel    pixel = m_skymap.dir2pix(dir);
+
+        // Skip if pixel is out of range
+        if (pixel.x() < -0.5 || pixel.x() > (m_skymap.nx() - 0.5) ||
+            pixel.y() < -0.5 || pixel.y() > (m_skymap.ny() - 0.5)) {
+            num_outside_map++;
+            continue;
+        }
+
+        // If RoI is valid then skip if  instrument direction is not within RoI
+        if (roi.is_valid() && !roi.contains(*inst)) {
+            continue;
+            num_outside_roi++;
+        }
+
+        // Fill event in skymap
+        m_skymap(pixel, 0) += 1.0;
+        num_in_map++;
+
+    } // endfor: looped over all events
+
+    // Log binning results
+    log_value(NORMAL, "Events in list", obs->events()->size());
+    log_value(NORMAL, "Events in map", num_in_map);
+    log_value(NORMAL, "Events outside RoI", num_outside_roi);
+    log_value(NORMAL, "Events outside map area", num_outside_map);
+    log_value(NORMAL, "Events outside energies", num_outside_erange);
+
+    // Write sky map into header
+    log_header2(EXPLICIT, "Sky map");
+    log_string(EXPLICIT, m_skymap.print(m_chatter));
+
+    // Return
+    return;
+}
+
+
+/***********************************************************************//**
+ * @brief Estimates the background in sky map for observation
+ *
+ * @param[in] obs CTA observation.
+ *
+ * Estimates the background in the sky map for a given observation and adds
+ * this estimate to the background sky map. The background estimation method
+ * is specified by the "bkgsubtract" parameter which can take the following
+ * values:
+ *
+ *     NONE - No background estimation
+ *     IRF  - Background estimation based on IRF template
+ ***************************************************************************/
+void ctskymap::map_background(GCTAObservation* obs)
+{
+    // Dispatch to appropriate background estimation method
+    if (m_bkgsubtract == "IRF") {
+        map_background_irf(obs);
+    }
+
+    // Return
+    return;
+}
+
+
+/***********************************************************************//**
+ * @brief Estimates the background in sky map based on IRF template
+ *
+ * @param[in] obs CTA observation.
+ *
+ * @exception GException::invalid_value
+ *            No response information available for observation.
+ *            No background template available in instrument response function.
+ *
+ * Estimates the background in the sky map using the IRF template for a given
+ * observation and adds this estimate to the background sky map. The IRF
+ * template is integrated numerically in energy.
+ ***************************************************************************/
+void ctskymap::map_background_irf(GCTAObservation* obs)
+{
+    // Get IRF response
+    const GCTAResponseIrf* rsp = dynamic_cast<const GCTAResponseIrf*>(obs->response());
+
+    // Throw an exception if observation has no instrument response function
+    if (rsp == NULL) {
+        std::string msg = "No response information available for "+
+                          get_obs_header(obs)+" to compute IRF background. "
+                          "Please specify response information or use "
+                          "another background subtraction method.";
+        throw GException::invalid_value(G_BKG_SUBTRACT_IRF, msg);
+    }
+
+    // Get IRF background template
+    const GCTABackground* bkg = rsp->background();
+
+    // Throw an exception if observation has no IRF background template
+    if (bkg == NULL) {
+        std::string msg = "No IRF background template found in instrument "
+                          "response function for "+
+                          get_obs_header(obs)+". Please specify an instrument "
+                          "response function containing a background template.";
+        throw GException::invalid_value(G_BKG_SUBTRACT_IRF, msg);
+    }
+
+    // Compute natural logarithm of energy range in MeV
+    double lnEmin = std::log(m_emin * 1.0e6);
+    double lnEmax = std::log(m_emax * 1.0e6);
+
+    // Extract region of interest from observation
+    GCTARoi roi = obs->roi();
+
+    // Initialise statistics
+    int    calls = 0;
+    double total = 0.0;
+
+    // Loop over all background map pixels
+    for (int i = 0; i < m_bkgmap.npix(); ++i) {
+
+        // Get sky direction of pixel
+        GSkyDir skydir = m_bkgmap.inx2dir(i);
+
+        // Convert sky direction in instrument direction
+        GCTAInstDir instdir = obs->pointing().instdir(skydir);
+
+        // If RoI is valid and instrument direction is not within RoI then
+        // skip pixel
+        if (roi.is_valid() && !roi.contains(instdir)) {
+            continue;
+        }
+
+        // Setup integration function
+        ctskymap::irf_kern integrand(bkg, &instdir);
+        GIntegral          integral(&integrand);
+
+        // Set precision (has been carefully adjusted using a test simulation
+        // over the energy range 20 GeV - 120 TeV)
+        integral.eps(1.0e-6);
+
+        // Do Romberg integration
+        double value = integral.romberg(lnEmin, lnEmax);
+
+        // Update number of background function calls
+        calls += integral.calls();
+        
+        // Multiply background rate with livetime and solid angle
+        value *= obs->livetime() * m_bkgmap.solidangle(i);
+
+        // Add number of background events to background map
+        m_bkgmap(i,0) += value;
+
+        // Update total number of background events
+        total += value;
+
+    } // endfor: looped over background map pixels
+  
+    // Log background subtraction results
+    log_value(NORMAL, "Events in background", int(total+0.5));
+    log_value(NORMAL, "Background evaluations", calls);
+
+    // Return
+    return;
+}
+
+
+/***********************************************************************//**
+ * @brief Estimates the background in sky map based on IRF template
+ *
+ * @param[in] lnE Natural logarithm of energy in MeV.
+ ***************************************************************************/
+double ctskymap::irf_kern::eval(const double& lnE)
+{
+    // Get log10 of energy in TeV
+    double logE = lnE * gammalib::inv_ln10 - 6;
+
+    // Get function value
+    double value = (*m_bgd)(logE, m_dir->detx(), m_dir->dety());
+
+    // Correct for variable substitution
+    value *= std::exp(lnE);
+
+    // Return value
+    return value;
+}
+

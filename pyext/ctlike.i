@@ -1,7 +1,7 @@
 /***************************************************************************
- *                   ctlike - CTA maximum likelihood tool                  *
+ *                ctlike - Maximum likelihood fitting tool                 *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2010-2012 by Jurgen Knodlseder                           *
+ *  copyright (C) 2010-2016 by Jurgen Knodlseder                           *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,45 +20,38 @@
  ***************************************************************************/
 /**
  * @file ctlike.i
- * @brief CTA maximum likelihood tool Python interface definition
- * @author J. Knodlseder
+ * @brief Maximum likelihood fitting tool definition
+ * @author Juergen Knoedlseder
  */
 %{
 /* Put headers and other declarations here that are needed for compilation */
 #include "ctlike.hpp"
-#include "GTools.hpp"
 %}
 
 
 /***********************************************************************//**
  * @class ctlike
  *
- * @brief CTA maximum likelihood tool Python interface
+ * @brief Maximum likelihood fitting tool
  ***************************************************************************/
-class ctlike : public GApplication  {
-
+class ctlike : public ctlikelihood {
 public:
     // Constructors and destructors
     ctlike(void);
-    explicit ctlike(GObservations obs);
+    explicit ctlike(const GObservations& obs);
     ctlike(int argc, char *argv[]);
     ctlike(const ctlike& app);
     virtual ~ctlike(void);
 
     // Methods
-    void           clear(void);
-    void           execute(void);
-    void           run(void);
-    void           save(void);
-    GObservations& obs(void);
-    GOptimizer*    opt(void);
-    void           get_parameters(void);
-    void           optimize_lm(void);
+    void clear(void);
+    void run(void);
+    void save(void);
 };
 
 
 /***********************************************************************//**
- * @brief CTA maximum likelihood tool Python extension
+ * @brief Maximum likelihood fitting tool Python extension
  ***************************************************************************/
 %extend ctlike {
     ctlike copy() {

@@ -1,8 +1,7 @@
 #############################################################################
-# Configuration for ctools - a set of tools for science analysis of CTA     #
-#                            data                                           #
+# Configuration for ctools - tools for science analysis of CTA data         #
 # ------------------------------------------------------------------------- #
-# Copyright (C) 2011-2013 Juergen Knoedlseder                               #
+# Copyright (C) 2011-2016 Juergen Knoedlseder                               #
 # ------------------------------------------------------------------------- #
 #                                                                           #
 #  This program is free software: you can redistribute it and/or modify     #
@@ -29,12 +28,34 @@
 #############################################################################
 # Initialisation                                                            #
 #############################################################################
-AC_INIT([ctools], [0.7.0], [jurgen.knodlseder@irap.omp.eu], [ctools])
+AC_INIT([ctools], [1.3.0.dev1], [jurgen.knodlseder@irap.omp.eu], [ctools])
 AC_CONFIG_SRCDIR([src/ctselect/ctselect.cpp])
 AC_CONFIG_MACRO_DIR([m4])
-#AM_INIT_AUTOMAKE([gnu no-dependencies])
-AM_INIT_AUTOMAKE([gnu -Wno-portability])
+#AM_INIT_AUTOMAKE([gnu no-dependencies foreign])
+AM_INIT_AUTOMAKE([gnu -Wno-portability foreign])
+#AM_INIT_AUTOMAKE([gnu -Wno-portability foreign serial-tests])
 AC_CONFIG_HEADER([config.h])
+
+
+#############################################################################
+# Library versioning (current:revision:age)                                 #
+# ------------------------------------------------------------------------- #
+# Here are a set of rules to update your library version information:       #
+# 1. Update the version information only immediately before a public        #
+#    release of your software. More frequent updates are unnecessary,       #
+#    and only guarantee that the current interface number gets larger       #
+#    faster.                                                                #
+# 2. If the library source code has changed at all since the last update,   #
+#    then increment revision.                                               #
+# 3. If any interfaces have been added, removed, or changed since the last  #
+#    update, increment current, and set revision to 0.                      #
+# 4. If any interfaces have been added since the last public release, then  #
+#    increment age.                                                         #
+# 5. If any interfaces have been removed or changed since the last public   #
+#    release, then set age to 0.                                            #
+#############################################################################
+CTOOLS_LT_VERSION="3:0:0"
+AC_SUBST(CTOOLS_LT_VERSION)
 
 
 #############################################################################
@@ -65,29 +86,91 @@ AC_CANONICAL_HOST
 
 
 #############################################################################
+# Check for --enable-coverage option
+#############################################################################
+AC_MSG_CHECKING(whether to build ctools for code coverage measure)
+AC_ARG_ENABLE([coverage],
+              AS_HELP_STRING([--enable-coverage],
+                             [turn on code coverage measure [default=no]]),
+              [enable_coverage="$enableval"],
+              [enable_coverage="no"])
+if test "x$enable_coverage" = "xyes"; then
+  AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+fi
+
+
+#############################################################################
 # Check for valid C++ compiler.  This has to come before the check for      #
 # header files, otherwise we won't detect if the C++ compiler is missing.   #
 #                                                                           #
 # A special kluge was added for Mac OS X >=10.7. As Apple switched to clang #
 # we search from this version on for the clang compiler.                    #
+#                                                                           #
+# We also signal whether Mac OS X >=10.9 (Mavericks) and Mac OS X >=10.11   #
+# (El Capitan).                                                             #
 #############################################################################
+# Set default Mac OS X version flags
+osx_lion=no
+osx_mavericks=no
+osx_el_capitan=no
 
 # Set default compiler lists
 cxx_list="g++ c++ gpp aCC CC cxx cc++ cl.exe FCC KCC RCC xlC_r xlC clang++"
 cc_list="gcc cc cl.exe clang"
 
-# Check if we have Mac OS X >= 10.7
+# Check if we have Mac OS X >= 10.7 and >= 10.11
 if test `uname -s` = "Darwin"; then
-  if test `sw_vers -productVersion | sed 's/\(10\.[[0-9]]*\).*/\1/'` '>' 10.6; then
+  version=`sw_vers -productVersion | sed 's/\(10\.[[0-9]]*\).*/\1/' | sed -e 's/\.//g'`
+  if [ test $version -ge 107 ]; then
     cxx_list="clang++ g++ c++ gpp aCC CC cxx cc++ cl.exe FCC KCC RCC xlC_r xlC"
     cc_list="clang gcc cc cl.exe"
+    osx_lion=yes
   fi
+  if [ test $version -ge 109 ]; then
+    osx_mavericks=yes
+  fi
+  if [ test $version -ge 1011 ]; then
+    osx_el_capitan=yes
+  fi
+fi
+AC_MSG_CHECKING([for Mac OS X >= 10.7])
+if [test "x$osx_lion" = "xyes"]; then
+        AC_MSG_RESULT(yes)
+else
+        AC_MSG_RESULT(no)
+fi
+AC_MSG_CHECKING([for Mac OS X >= 10.9])
+if [test "x$osx_mavericks" = "xyes"]; then
+        AC_MSG_RESULT(yes)
+else
+        AC_MSG_RESULT(no)
+fi
+AC_MSG_CHECKING([for Mac OS X >= 10.11])
+if [test "x$osx_el_capitan" = "xyes"]; then
+        AC_MSG_RESULT(yes)
+else
+        AC_MSG_RESULT(no)
+fi
+AM_CONDITIONAL(IS_ELCAPITAN, test "x$osx_el_capitan" = "xyes")
+
+# If coverage is selected then save current C++ options
+if test "x$enable_coverage" = "xyes"; then
+  SAVED_CXXFLAGS=$CXXFLAGS
+  SAVED_CFLAGS=$CFLAGS
 fi
 
 # Our language is C++
 AC_LANG(C++)
 AC_PROG_CXX($cxx_list)
 AC_PROG_CC($cc_list)
+
+# If coverage is selected then restore former C++ options
+if test "x$enable_coverage" = "xyes"; then
+  CXXFLAGS=$SAVED_CXXFLAGS
+  CFLAGS=$SAVED_CFLAGS
+fi
 
 
 #############################################################################
@@ -522,11 +605,12 @@ AC_C_INLINE
 #############################################################################
 # Checks if Python bindings are to be build                                 #
 # ------------------------------------------------------------------------- #
-# Python binding requires Python and either the files ctools_wrap.cpp and   #
-# ctools.py or swig to create these files.  The following conditionals are  #
+# Python binding requires Python and either the files tools_wrap.cpp and    #
+# tools.py or swig to create these files.  The following conditionals are   #
 # set:                                                                      #
-# WITH_PYTHON - Python bindings will be built                               #
-# HAVE_SWIG   - swig is available                                           #
+# WITH_PYTHON   - Python bindings will be built                             #
+# HAVE_SWIG     - swig is available                                         #
+# HAVE_WRAPPERS - wrappers are available                                    #
 #############################################################################
 # Initialise flags
 enable_python="no"
@@ -534,6 +618,7 @@ has_python="no"
 has_python_h="no"
 has_swig="no"
 has_wrappers="no"
+build_wrappers="no"
 
 # Python binding enabled?
 AC_ARG_ENABLE([python-binding],
@@ -547,9 +632,9 @@ if test "x$ac_enable_python_binding" = "xno"; then
 else
 
   # Do we have Python and Python.h?
-  AM_PATH_PYTHON([2.2],
+  AM_PATH_PYTHON([2.3],
                  [has_python="yes"],
-                 [AC_MSG_WARN([Python >= 2.2 not found. Python >= 2.2 is required to build python binding. Python can be obtained from http://www.python.org])])
+                 [AC_MSG_WARN([Python >= 2.3 not found. Python >= 2.3 is required to build python binding. Python can be obtained from http://www.python.org])])
 
   # It would really be weired if Python has not been found, as barely every system has Python. Maybe
   # it was not found because the autoconf is so old, and in an early version of the AM_PATH_PYTHON
@@ -568,14 +653,14 @@ else
 
     # Set opening and closing symbols to make setup.py compatible for versions 2 and 3
     if test ${PYTHON_VERSION} '<' 3; then
-      PYTHON_OPEN=" "
-      PYTHON_CLOSE=""
+      PYTHON_RELATIVE_IMPORT=""
+      PYTHON_FROM_DOT_=""
     else
-      PYTHON_OPEN="("
-      PYTHON_CLOSE=")"
+      PYTHON_RELATIVE_IMPORT="."
+      PYTHON_FROM_DOT_="from . "
     fi
-    AC_SUBST(PYTHON_OPEN)  
-    AC_SUBST(PYTHON_CLOSE)
+    AC_SUBST(PYTHON_RELATIVE_IMPORT)  
+    AC_SUBST(PYTHON_FROM_DOT_)  
 
     # Do we have distutils?
     AC_MSG_CHECKING([for the distutils Python package])
@@ -588,20 +673,40 @@ else
 
     # If we have distutils then get python path from distutils ...
     if test -z "$ac_distutils_result"; then
-      if test ${PYTHON_VERSION} '<' 3; then
-        python_path=`$PYTHON -c "import distutils.sysconfig; \
-                                 print distutils.sysconfig.get_python_inc();"`
-      else
-        python_path=`$PYTHON -c "import distutils.sysconfig; \
-                                 print(distutils.sysconfig.get_python_inc());"`
-      fi                                         
+      python_path=`$PYTHON -c "import distutils.sysconfig; \
+                               print(distutils.sysconfig.get_python_inc());"`
       if test -n "${python_path}"; then
         AC_CHECK_HEADERS($python_path/Python.h, [has_python_h="yes"], [has_python_h="no"]) 
         python_path="-I$python_path"
       fi
       PYTHON_CPPFLAGS=$python_path
-      CPPFLAGS="${CPPFLAGS} ${python_path}"
       AC_SUBST([PYTHON_CPPFLAGS])
+
+      # If we have Mavericks then get the MACOSX_DEPLOYMENT_TARGET from Python
+      # If the target is older then Mavericks then set the MACOSX_DEPLOYMENT_TARGET
+      # to this value as otherwise we get trouble with name mangling (that changed)
+      if [test "x$osx_mavericks" = "xyes"]; then
+        AC_MSG_CHECKING([Python MACOSX_DEPLOYMENT_TARGET])
+        python_target=`$PYTHON -c "from distutils import sysconfig; \
+                                   print(sysconfig.get_config_vars()[['MACOSX_DEPLOYMENT_TARGET']]);" 2> /dev/null`
+        python_compact_target=`echo $python_target | sed 's/\(10\.[[0-9]]*\).*/\1/' | sed -e 's/\.//g'`
+        case $python_compact_target in
+          (*[!0-9]*|'')
+            AC_MSG_RESULT(unknown)
+            ;;
+          (*)
+            AC_MSG_RESULT(${python_target})
+            if [ test $python_compact_target -le 108 ]; then
+              CONFIGURE_MACOSX_DEPLOYMENT_TARGET="$python_target"
+              MACOSX_DEPLOYMENT_TARGET="$python_target"
+              export MACOSX_DEPLOYMENT_TARGET
+              EXPORT_MACOSX_DEPLOYMENT_TARGET=''
+              LIBS="${LIBS} -lstdc++"
+              AC_MSG_NOTICE([set MACOSX_DEPLOYMENT_TARGET to ${python_target}])
+            fi
+            ;;
+        esac
+      fi
 
     # ... otherwise check for includes relative to exectuable (obsolete?)
     else                             
@@ -628,12 +733,18 @@ else
     has_swig="yes"
   fi
  
-  # Do we have wrappers (ctools_wrap.cpp and ctools.py)?
+  # Do we have wrappers (tools_wrap.cpp and tools.py)?
   has_wrappers="yes"
-  AC_CHECK_FILES([pyext/ctools_wrap.cpp pyext/ctools.py],,
+  AC_CHECK_FILES([$srcdir/pyext/ctools/tools_wrap.cpp
+                  $srcdir/pyext/ctools/tools.py],,
                  [has_wrappers="no"])
   if test "x$has_wrappers" = "xno"; then
     AC_MSG_WARN([Python wrapper missing. Requires swig for wrapper generation.])
+  fi
+
+  # Don't we have wrappers but we have swig
+  if [test "x$has_wrappers" = "xno" -a "x$has_swig" = "xyes"]; then
+    build_wrappers="yes"
   fi
 
   # Signal if Python is enabled
@@ -644,8 +755,10 @@ else
   fi
 
 fi
-AM_CONDITIONAL(HAVE_SWIG, test "x$has_swig" = "xyes")
 AM_CONDITIONAL(WITH_PYTHON, test "x$enable_python" = "xyes")
+AM_CONDITIONAL(HAVE_SWIG, test "x$has_swig" = "xyes")
+AM_CONDITIONAL(HAVE_WRAPPERS, test "x$has_wrappers" = "xyes")
+AM_CONDITIONAL(BUILD_WRAPPERS, test "x$build_wrappers" = "xyes")
 
 # Set Python environment
 if test "x$enable_python" = "xyes"; then
@@ -669,12 +782,35 @@ if test "x$enable_python" = "xyes"; then
 
 else
   if test "x$has_python_wrap" = "xno" -a "x$has_swig" = "xno"; then
-    AC_MSG_WARN([Neither pyext/ctools_wrap.cpp and pyext/ctools.py nor swig has not been found])
+    AC_MSG_WARN([Neither pyext/ctools/tools_wrap.cpp and pyext/ctools/tools.py nor swig has not been found])
     AC_MSG_WARN([Python binding for ctools cannot be built])
-    AC_MSG_WARN([Either use a ctools distribution with ctools_wrap.cpp and ctools.py shipped or install swig on your system])
+    AC_MSG_WARN([Either use a ctools distribution with tools_wrap.cpp and tools.py shipped or install swig on your system])
     AC_MSG_WARN([swig can be obtained from http://www.swig.org/])
   fi
 fi
+
+
+#############################################################################
+# Checks for coverage option                                                #
+#############################################################################
+# Initialise Python coverage with empty string
+PYTHON_COVERAGE=
+COVERAGE_CXXFLAGS=
+
+# If coverage option has been selected then set some variables
+if test "x$enable_coverage" = "xyes"; then
+  CXXFLAGS="--coverage $CXXFLAGS"
+  COVERAGE_CXXFLAGS="--coverage"
+  LDFLAGS="--coverage $LDFLAGS"
+  if test "x$has_python" = "xyes"; then
+    PYTHON_COVERAGE="coverage run --branch --append "
+  fi
+  AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+fi
+AC_SUBST(PYTHON_COVERAGE)
+AC_SUBST(COVERAGE_CXXFLAGS)
 
 
 #############################################################################
@@ -748,8 +884,8 @@ darwin_kluge=no
 # Detect if GammaLib has been compiled with OpenMP
 AC_MSG_CHECKING(whether GammaLib has been compiled with OpenMP)
 AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <GObservations.hpp>]],,)],			     
-		   [gammalib_with_openmp=no;AC_MSG_RESULT(no)],
- 		   [gammalib_with_openmp=yes;AC_MSG_RESULT(yes)])
+               [gammalib_with_openmp=no;AC_MSG_RESULT(no)],
+               [gammalib_with_openmp=yes;AC_MSG_RESULT(yes)])
 
 # Check if openMP is available
 m4_ifdef([AC_OPENMP],[AC_OPENMP], [AX_OPENMP([openmp_ok=yes],[openmp_ok=no])])
@@ -835,7 +971,7 @@ OPENMP_LIB_LDFLAGS=
 #fi
 AC_SUBST(OPENMP_LIB_LDFLAGS)
 
-# Signal if ctools cannot be compiled as gammalibe requires OpenMP but ctools
+# Signal if ctools cannot be compiled as gammalib requires OpenMP but ctools
 # cannot be compiled with OpenMP
 if test "x$enable_openmp" = "xno" && test "x$gammalib_with_openmp" = "xyes"; then
   AC_MSG_ERROR([The GammaLib library has been built with openMP support but OpenMP is not available on this system. Please install OpenMP or re-build GammaLib without OpenMP support.])
@@ -862,6 +998,16 @@ AC_SUBST(LIB_LINK_OPTION)
 
 
 #############################################################################
+# Checks for Doxygen                                                        #
+#############################################################################
+DX_HTML_FEATURE(ON)
+DX_PS_FEATURE(OFF)
+DX_PDF_FEATURE(OFF)
+DX_MAN_FEATURE(ON)
+DX_INIT_DOXYGEN([ctools], [doc/Doxyfile], [doc/doxygen])
+
+
+#############################################################################
 # Set list of output files to be created                                    #
 #############################################################################
 AC_CONFIG_FILES([Makefile
@@ -872,17 +1018,37 @@ AC_CONFIG_FILES([Makefile
                  src/ctobssim/Makefile
                  src/ctskymap/Makefile
                  src/ctselect/Makefile
+                 src/ctexpcube/Makefile
+                 src/ctpsfcube/Makefile
+                 src/ctedispcube/Makefile
+                 src/ctbkgcube/Makefile
+                 src/ctmapcube/Makefile
+                 src/ctcubemask/Makefile
+                 src/cttsmap/Makefile
+                 src/ctbutterfly/Makefile
+                 src/ctulimit/Makefile
+                 src/cterror/Makefile
+                 src/support/Makefile
                  src/ctools-setup
                  test/Makefile
-                 test/test_cscripts.sh
+                 test/test_python_ctools.sh
+                 test/test_python_cscripts.sh
+                 test/test_examples.py
+                 test/testing.py
                  pyext/Makefile
                  pyext/setup.py
+                 pyext/ctools/__init__.py
+                 cscripts/__init__.py
+                 cscripts/Makefile
                  caldb/Makefile
                  models/Makefile
                  examples/Makefile
-                 scripts/Makefile
-                 ctools.pc],
-                [if test -f test/test_cscripts.sh; then chmod +x test/test_cscripts.sh; fi])
+                 ctools.pc
+                 testconf.sh],
+                [if test -f test/test_python_ctools.sh; then chmod +x test/test_python_ctools.sh; fi;
+                 if test -f test/test_python_cscripts.sh; then chmod +x test/test_python_cscripts.sh; fi;
+                 if test -f test/test_examples.py; then chmod +x test/test_examples.py; fi;
+                 if test -f testconf.sh; then chmod +x testconf.sh; fi])
 AC_OUTPUT
 
 
@@ -943,6 +1109,13 @@ if test "x$ac_enable_python_binding" = "xyes"; then
   fi
 else
   echo "  - Make Python binding          (no)"
+fi
+
+# Dump Doxygen information
+if test "$DX_DOXYGEN" != ""; then
+  echo "  * Doxygen                      (yes)   $DX_DOXYGEN"
+else
+  echo "  - Doxygen                      (no)"
 fi
 
 # Dump compile options

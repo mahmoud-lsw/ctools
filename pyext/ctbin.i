@@ -1,7 +1,7 @@
 /***************************************************************************
- *                      ctbin - CTA data binning tool                      *
+ *                        ctbin - Event binning tool                       *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2010-2013 by Juergen Knoedlseder                         *
+ *  copyright (C) 2010-2016 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,43 +20,40 @@
  ***************************************************************************/
 /**
  * @file ctbin.i
- * @brief CTA data binning tool Python interface definition
+ * @brief Event binning tool definition
  * @author Juergen Knoedlseder
  */
 %{
 /* Put headers and other declarations here that are needed for compilation */
 #include "ctbin.hpp"
-#include "GTools.hpp"
 %}
 
 
 /***********************************************************************//**
  * @class ctbin
  *
- * @brief CTA data binning tool Python interface
+ * @brief Event binning tool
  ***************************************************************************/
-class ctbin : public GApplication  {
+class ctbin : public ctobservation {
 public:
     // Constructors and destructors
     ctbin(void);
-    explicit ctbin(GObservations obs);
+    explicit ctbin(const GObservations& obs);
     ctbin(int argc, char *argv[]);
     ctbin(const ctbin& app);
     virtual ~ctbin(void);
 
     // Methods
     void                 clear(void);
-    void                 execute(void);
     void                 run(void);
     void                 save(void);
-    const GObservations& obs(void) const;
-    void                 get_parameters(void);
-    void                 bin_events(GCTAObservation* obs);
+    void                 publish(const std::string& name = "");
+    const GCTAEventCube& cube(void) const;
 };
 
 
 /***********************************************************************//**
- * @brief CTA data binning tool Python extension
+ * @brief Event binning tool Python extension
  ***************************************************************************/
 %extend ctbin {
     ctbin copy() {

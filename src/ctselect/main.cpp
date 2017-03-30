@@ -1,7 +1,7 @@
 /***************************************************************************
  *                ctselect - CTA data selection tool main code             *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2010-2011 by Jurgen Knodlseder                           *
+ *  copyright (C) 2010-2016 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -19,16 +19,16 @@
  *                                                                         *
  ***************************************************************************/
 /**
- * @file ctselect.cpp
+ * @file ctselect/main.cpp
  * @brief CTA data selection tool main code
- * @author J. Knodlseder
+ * @author Juergen Knoedlseder
  */
 
 /* __ Includes ___________________________________________________________ */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
-#include <cstdio>
+#include "support.hpp"
 #include "ctselect.hpp"
 
 
@@ -37,39 +37,40 @@
  *
  * @param[in] argc Number of arguments
  * @param[in] argv Arguments
+ *
+ * This is the main entry point of the ctselect application. It allocates a
+ * ctselect object and executes the application. Any exceptions that occur
+ * will be catched and corresponding error messages written in the
+ * application logger and into the standard output.
  ***************************************************************************/
 int main (int argc, char *argv[])
 {
     // Initialise return code
     int rc = 1;
 
-    // Create instance of application
-    ctselect application(argc, argv);
+    // Initialise pointer on application
+    ctselect* application = NULL;
 
-    // Run application
+    // Execute application
     try {
-        // Execute application
-        application.execute();
 
-        // Signal success
-        rc = 0;
+        // Create instance of application
+        application = new ctselect(argc, argv);
+
+        // Execute ctool
+        rc = execute_ctool(application);
+
     }
+
     catch (std::exception &e) {
 
-        // Extract error message
-        std::string message = e.what();
-        std::string signal  = "*** ERROR encounterted in the execution of"
-                              " ctselect. Run aborted ...";
+        // Report exception
+        report_ctool_failure("ctselect", e.what());
 
-        // Write error in logger
-        application.log << message << std::endl;
-        application.log << signal  << std::endl;
+    }
 
-        // Write error on standard output
-        std::cout << message << std::endl;
-        std::cout << signal  << std::endl;
-
-    } // endcatch: catched any application error
+    // Delete application
+    delete application;
 
     // Return
     return rc;

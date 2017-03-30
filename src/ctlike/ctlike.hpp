@@ -1,7 +1,7 @@
 /***************************************************************************
- *                   ctlike - CTA maximum likelihood tool                  *
+ *                ctlike - Maximum likelihood fitting tool                 *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2010-2013 by Juergen Knoedlseder                         *
+ *  copyright (C) 2010-2016 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,7 +20,7 @@
  ***************************************************************************/
 /**
  * @file ctlike.hpp
- * @brief CTA maximum likelihood tool interface definition
+ * @brief Maximum likelihood fitting tool definition
  * @author Juergen Knoedlseder
  */
 
@@ -28,62 +28,57 @@
 #define CTLIKE_HPP
 
 /* __ Includes ___________________________________________________________ */
-#include <string>
-#include "GammaLib.hpp"
-#include "GCTALib.hpp"
+#include "ctlikelihood.hpp"
 
 /* __Definitions _________________________________________________________ */
 #define CTLIKE_NAME    "ctlike"
-#define CTLIKE_VERSION "00-05-00"
+#define CTLIKE_VERSION "1.2.0"
 
 
 /***********************************************************************//**
  * @class ctlike
  *
- * @brief CTA maximum likelihood tool interface defintion.
+ * @brief Maximum likelihood fitting tool
  ***************************************************************************/
-class ctlike : public GApplication  {
+class ctlike : public ctlikelihood {
+
 public:
     // Constructors and destructors
     ctlike(void);
-    explicit ctlike(GObservations obs);
+    explicit ctlike(const GObservations& obs);
     ctlike(int argc, char *argv[]);
     ctlike(const ctlike& app);
     virtual ~ctlike(void);
 
     // Operators
-    ctlike& operator= (const ctlike& app);
+    ctlike& operator=(const ctlike& app);
 
     // Methods
-    void           clear(void);
-    void           execute(void);
-    void           run(void);
-    void           save(void);
-    GObservations& obs(void) { return m_obs; }
-    GOptimizer*    opt(void) { return m_opt; }
-    void           get_parameters(void);
-    void           optimize_lm(void);
+    void clear(void);
+    void run(void);
+    void save(void);
 
 protected:
     // Protected methods
-    void init_members(void);
-    void copy_members(const ctlike& app);
-    void free_members(void);
+    void   init_members(void);
+    void   copy_members(const ctlike& app);
+    void   free_members(void);
+    void   get_parameters(void);
+    void   optimize_lm(void);
+    double reoptimize_lm(void);
 
     // User parameters
-    std::string   m_stat;       //!< Optimisation statistics (poisson/gaussian)
-    bool          m_refit;      //!< Refitting
-    std::string   m_caldb;      //!< Calibration database
-    std::string   m_irf;        //!< Instrument response functions
-    std::string   m_outmdl;     //!< Source model output XML file
+    bool          m_refit;           //!< Refitting
+    GFilename     m_outmodel;        //!< Source model output XML file name
+    GFilename     m_outcovmat;       //!< Covariance matrix output FITS file name
+    bool          m_apply_edisp;     //!< Apply energy dispersion?
+    bool          m_fix_spat_for_ts; //!< Fix spatial parameters for TS computation?
+    GChatter      m_chatter;         //!< Chattiness
 
     // Members
-    GObservations m_obs;        //!< Observations
     int           m_max_iter;   //!< Maximum number of iterations
     int           m_max_stall;  //!< Maximum number of stalls
     double        m_logL;       //!< Maximum log likelihood
-    GOptimizer*   m_opt;        //!< Optimizer
-    bool          m_read_ahead; //!< Read ahead parameters
 };
 
 #endif /* CTLIKE_HPP */

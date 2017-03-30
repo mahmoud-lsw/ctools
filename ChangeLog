@@ -1,12 +1,217 @@
-2013-04-09  Juergen Knoedlseder  <jurgen.knodlseder@irap.omp.eu>
+2017-03-28
+
+        * Version 1.3.0 released
+        ========================
+
+        Support of map cubes lying outside RoI in ctobssim 
+        Support energy boundary FITS file in ctmapcube (#1978)
+        Add csebins script (#1976)
+        Consider RoI in ctskymap and use numerical integration for IRF (#1975)
+        Set local language to english (#1370)
+        Enhance logfile output of csroot2caldb script
+        Set default deadc value to 0.98 (CTA has <2% deadtime)
+
+
+2017-02-09
+
+        * Version 1.2.0 released
+        ========================
+
+        Replace has_key() by in for Python 3.x compatibility (#1924)
+        cslightcrv no longer accepts counts cubes on input (#1920)
+        Set ctbin reference time to CTA reference time (#1922)
+        Change ds9file parameter to outds9file
+        Add cssrcdetect script (#1617)
+        Add background subtraction to ctskymap tool (#1882)
+        Add csobsselect script (#1881)
+        Add csmodelselect script (#1879)
+        Add startindex parameter to ctobssim (#1878)
+        Fix energy boundary handline in cssens (#1873)
+        Add outcovmat parameter to ctlike (#1863)
+        Add publish parameter and methods to ctobssim, ctselect, cslightcrv and csspec (#1871)
+        Add csviscube script (#1853)
+        Add zenith and azimuth angle information to IRF caldb (#1853)
+        Fix ctbin segfault bug for varying energy thresholds (#1850)
+        Make csresmap enumbins parameter hidden (#1844)
+        Rename ctskymap::map() to ctskymap::skymap() (#1828)
+        Introduce ctobservation and ctlikelihood base classes (#1828, #1846)
+        Remove ctselect::time_reference() method
+        Add ctool and cscript pars() methods (#1838)
+        Fix ctbin::save() bug for empty observation container (#1835)
+        Fix exception when calling ctools clear() methods (#1835)
+        Add support for new spectral models in ctulimit (#1832)
+        Add support modules to cscripts (#1830)
+        Fix lacking coverage measure for cscripts execution (#1827)
+        Set "addbounds" parameters by default to "no" (#1819)
+
+
+2016-07-24
+
+        * Version 1.1.0 released
+        ========================
+
+        Adapt to new spatial (#1818) and spectral model names (#1821)
+        Fix stacked analysis bias (#1819)
+        Add background model science verification (#1815)
+        Add cstsmapsplit script (#1797)
+        Add unit tests for all example scripts
+        Handle zero parameter errors in ctulimit (#1795)
+        Compute counts cube weights in ctbin (#1789)
+        Adapt to new stacked cube interface (#1788)
+        Add ctools and cscripts unit tests
+        Add "bgdoversample" and "bgdinfill" parameters to csroot2caldb
+        Add csobsdef.pntdef() method (#1771)
+        Add ctmapcube tool (#1760)
+        Add "seed" parameter to cspull (#1755)
+        Add ctedispcube tool (#1724)
+        Test and import IACT scripts only for Python 2.6+ (#1715)
+        Adapt to revise GTime operators (#1714)
+        Add publish() methods to tools producing images (#1710)
+        Read ahead output filename in cterror (#1700)
+        Subdivide simulation energy range in ctobssim (#1673)
+        Delete existing events before simulation in ctobssim (#1663)
+        Add csiactcopy script (#1661)
+        Add documentation for IACT analysis (#1646)
+        ctselect allows usage of non-default events and GTI extensions (#1598)
+        Add csworkflow workflow manager script (#1508)
+        Support out of source builds (#1484)
+
+
+2016-01-27
+
+        * Bug fix version 1.0.1 released
+        ================================
+
+        Re-enable ctmodel computation for stacked analysis (#1609)
+        Solve compatibility issues with Anaconda on Mac OS X (#1607)
+        Change diffuse map for science verification
+
+
+2015-12-18
+
+        * Version 1.0.0 released
+        ========================
+
+        Update end-user documentation
+        Rename cshessobs to csiactobs and add csiactdata (#1608)
+        Ignore errors in El Capitan post processing (#1605)
+        Change GException to RuntimeError in cscripts (#1604)
+        Adapt to GammaLib interface changs (#1603)
+        Add csobs2caldb script (#1579)
+        Add csobsinfo, csmodelinfo, csmodelmerge, cstsmapmerge (#1578)
+        Implement handling of stacked data in csspec (#1566)
+        Resolve Python test problem on El Capitan (#1563)
+
+
+2015-10-31
+
+        * Version 0.10.0 released
+        =========================
+
+        Add science verification tests (#1555)
+        Specifying --help on command line displays help text (#572)
+        Limit power law parameters in ctbkgcube (#1547)
+        Extend cspull to stacked analysis (#1503)
+        Add tests for installed ctools version (#1486)
+        Create cscripts Python module, move obsutils in that module (#1470)
+        Add csinfo script (#1489)
+        Removed obsutils.spectrum() function (replaced by csspec)
+        Add cterror tool
+        Check existence of ROI in ctbin (#1476)
+        Allocate optimizer in ctlike upon construction (#1471)
+        Move cscripts into the ctools Python module (#1470)
+
+
+2015-05-22
+
+        * Version 0.9.0 released
+        ========================
+
+        Adapt to GammaLib 0.10.0 interface
+        Do not import automatically Python scripts
+        Support INDEF/NONE/UNDEF/UNDEFINED parameters in ctselect
+        Modify cssens parameter interface (#1426)
+        Add csobsdef script (#1429)
+        Add ctulimit tool (#1363)
+        Allow ctmodel usage for stacked analysis from command line
+        Correct rate check in ctobssim for map cubes (#1452)
+        Handle background cubes for stacked analysis (#1371)
+        Add csspec script (#1364)
+        Add cslightcrv script (#1365)
+        Correct sensitivity computation in cssens
+
+
+2015-01-08
+
+        * Bug fix version 0.8.1 released
+        ================================
+
+        Include Python wrappers in source code distribution
+
+
+2014-11-08
+
+        * Version 0.8.0 released
+        ========================
+
+        Clean-up public interface
+        Adapt to GammaLib 0.9.0 interface
+        Add ctexpcube tool (generates exposure cube)
+        Add ctpsfcube tool (generates PSF cube)
+        Add ctbkgcube tool (generates background cube)
+        Add ctcubemask tool (masks event bins in event cube)
+        Add cttsmap tool (generates TS map)
+        Add ctbutterfly tool (generates butterfly diagram)
+        Add csresmap script (generates residual map)
+        Introduce ctool base class
+        ctbin now always merges event lists into a single counts cube
+        ctmodel now always creates a single model cube
+        Support energy dispersion in ctobssim, ctlike and ctmodel	
+        Correct ctobssim for thread safety
+        Support save and user energy thresholds in ctselect
+        Correctly apply time references in ctselect
+        Reduce memory usage
+        Move obsutils to ctools namespace
+        Add several functions to obsutils
+        Enhance documentation
+
+
+2014-02-20
+
+        * Bug fix Version 0.7.2 released
+        ================================
+
+        Add logL and event statistics to cspull output file
+        Properly close temporary file in ctselect (#1149)
+
+
+2014-02-05
+        
+        * Bug fix Version 0.7.1 released
+        ================================
+        
+        Added missing hyphens in pfiles synchronisation section (#1091)
+        Add configuration test script (#1091)
+        Correctly filter instrument and id attributes in ctobssim
+        Use reworked GCaldb for calibration data access (#1116)
+
+
+2014-01-18
 
         * Version 0.7.0 released
         ========================
 
         Adapt to GammaLib-00-08-00 interface
-        ctobssim now only simulates events within ROI
+        ctobssim now only simulates events within ROI and supports
+          all kinds of data space models; time slice durations are
+          determined based on source flux
+        ctbin now implements LIN and FILE binning algorithms
+        ctbin, ctskymap and ctmodel now generate maps with
+          increasing longitude to the left
+        Update parameter files if necessary
 
-2012-12-21  Juergen Knoedlseder  <jurgen.knodlseder@irap.omp.eu>
+
+2012-12-21
 
         * Version 0.6.0 released
         ========================
@@ -16,14 +221,16 @@
         Adapt to GammaLib-00-07-00 interface
         Correct ctobssim usage of seed value
 
-2012-10-11  Juergen Knoedlseder  <jurgen.knodlseder@irap.omp.eu>
+
+2012-10-11
 
         * Bug fix version 0.5.2 released
         ================================
 
         Correct gcc 4.2.x OpenMP dlopen() test
 
-2012-09-18  Juergen Knoedlseder  <jurgen.knodlseder@irap.omp.eu>
+
+2012-09-18
 
         * Bug fix version 0.5.1 released
         ================================
@@ -35,7 +242,8 @@
         Improve Python bindings configuration
         Add TEST_ENV_DIR to load library path
 
-2012-09-14  Juergen Knoedlseder  <jurgen.knodlseder@irap.omp.eu>
+
+2012-09-14
 
         * Version 0.5.0 released
         ========================
@@ -44,7 +252,8 @@
         Improve logging information for ctlike
         Add OpenPM support
 
-2012-03-08  Juergen Knoedlseder  <jurgen.knodlseder@irap.omp.eu>
+
+2012-03-08
 
         * Version 0.4.0 released
         ========================
@@ -61,7 +270,7 @@
         Improve building of Python bindings
 
 
-2011-10-06  Juergen Knoedlseder  <knodlseder@cesr.fr>
+2011-10-06
 
         * Version 0.3.0 released
         ========================
@@ -69,7 +278,7 @@
         Renamed to ctools
 
 
-2011-10-03  Juergen Knoedlseder  <knodlseder@cesr.fr>
+2011-10-03
 
         * Version 0.2.5 released
         ========================
@@ -79,7 +288,8 @@
         Add examples directory
         Add scripts directory
 
-2011-07-20  Juergen Knoedlseder  <knodlseder@cesr.fr>
+
+2011-07-20
 
         * Version 0.2.4 released
         ========================
@@ -87,14 +297,16 @@
         Improve configure script
         Add scripts for ctatools environment setting
 
-2011-07-09  Juergen Knoedlseder  <knodlseder@cesr.fr>
+
+2011-07-09
 
         * Version 0.2.3 released
         ========================
 
         Improve configure script
 
-2011-02-24  Juergen Knoedlseder  <knodlseder@cesr.fr>
+
+2011-02-24
 
         * Version 0.2.1 released
         ========================
@@ -102,7 +314,8 @@
         Correct test environment
         Adjust Python wrapper compile option on Darwin
 
-2011-02-21  Juergen Knoedlseder  <knodlseder@cesr.fr>
+
+2011-02-21
 
         * Version 0.2.0 released
         ========================
@@ -111,7 +324,8 @@
         Add unit test (make check)
         Add html documentation
 
-2011-02-02  Juergen Knoedlseder  <knodlseder@cesr.fr>
+
+2011-02-02
 
         * Version 0.1.0 released
         ========================

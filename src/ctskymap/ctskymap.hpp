@@ -1,7 +1,7 @@
 /***************************************************************************
- *                     ctskymap - CTA sky mapping tool                     *
+ *                       ctskymap - Sky mapping tool                       *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2010-2013 by Juergen Knoedlseder                         *
+ *  copyright (C) 2010-2017 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,7 +20,7 @@
  ***************************************************************************/
 /**
  * @file ctskymap.hpp
- * @brief CTA sky mapping tool definition
+ * @brief Sky mapping tool definition
  * @author Juergen Knoedlseder
  */
 
@@ -28,67 +28,88 @@
 #define CTSKYMAP_HPP
 
 /* __ Includes ___________________________________________________________ */
-#include "GammaLib.hpp"
-#include "GCTALib.hpp"
+#include <string>
+#include "ctobservation.hpp"
 
 /* __Definitions _________________________________________________________ */
 #define CTSKYMAP_NAME    "ctskymap"
-#define CTSKYMAP_VERSION "00-02-00"
+#define CTSKYMAP_VERSION "1.3.0"
 
 
 /***********************************************************************//**
  * @class ctskymap
  *
- * @brief CTA sky mapping tool interface defintion
+ * @brief Sky mapping tool
  *
  * This class creates a sky map from a CTA event list.
  ***************************************************************************/
-class ctskymap : public GApplication  {
+class ctskymap : public ctobservation {
+
 public:
     // Constructors and destructors
     ctskymap(void);
-    explicit ctskymap(GObservations obs);
+    explicit ctskymap(const GObservations& obs);
     ctskymap(int argc, char *argv[]);
     ctskymap(const ctskymap& app);
     virtual ~ctskymap(void);
 
     // Operators
-    ctskymap& operator= (const ctskymap& app);
+    ctskymap& operator=(const ctskymap& app);
 
     // Methods
     void           clear(void);
-    void           execute(void);
     void           run(void);
     void           save(void);
-    GObservations& obs(void) { return m_obs; }
-    GSkymap&       skymap(void) { return m_skymap; }
-    void           get_parameters(void);
-    void           init_map(GCTAObservation* obs);
-    void           map_events(GCTAObservation* obs);
-
+    void           publish(const std::string& name = "");
+    const GSkyMap& skymap(void) const;
 
 protected:
     // Protected methods
     void init_members(void);
     void copy_members(const ctskymap& app);
     void free_members(void);
+    void get_parameters(void);
+    void map_events(GCTAObservation* obs);
+    void map_background(GCTAObservation* obs);
+    void map_background_irf(GCTAObservation* obs);
+
+    // Background integration kernel
+    class irf_kern : public GFunction {
+    public:
+        irf_kern(const GCTABackground* bgd,
+                 const GCTAInstDir*    dir) :
+                 m_bgd(bgd),
+                 m_dir(dir) { }
+        double eval(const double& lnE);
+    protected:
+        const GCTABackground* m_bgd;   //!< Pointer to background
+        const GCTAInstDir*    m_dir;   //!< Pointer to instrument direction
+    };
 
     // User parameters
-    std::string   m_evfile;     //!< Input event list
-    std::string   m_outfile;    //!< Output counts map
-    double        m_emin;       //!< Minimum energy (TeV)
-    double        m_emax;       //!< Maximum energy (TeV)
-    std::string   m_proj;       //!< WCS projection
-    std::string   m_coordsys;   //!< Coordinate system
-    double        m_xref;       //!< Longitude reference coordinate
-    double        m_yref;       //!< Latitude reference coordinate
-    double        m_binsz;      //!< Pixel size
-    int           m_nxpix;      //!< Number of pixels in longitude
-    int           m_nypix;      //!< Number of pixels in latitude
+    GFilename     m_outmap;      //!< Output file name
+    double        m_emin;        //!< Minimum energy (TeV)
+    double        m_emax;        //!< Maximum energy (TeV)
+    std::string   m_bkgsubtract; //!< Background subtraction method
+    bool          m_publish;     //!< Publish sky map?
+    GChatter      m_chatter;     //!< Chattiness
 
     // Protected members
-    GObservations m_obs;        //!< Observation container
-    GSkymap       m_skymap;     //!< Sky map
+    GSkyMap       m_skymap;     //!< Sky map
+    GSkyMap       m_bkgmap;     //!< Background map
+    GSkyMap       m_sigmap;     //!< Significance map
 };
+
+
+/***********************************************************************//**
+ * @brief Return observation container
+ *
+ * @return Reference to observation container
+ ***************************************************************************/
+inline
+const GSkyMap& ctskymap::skymap(void) const
+{
+    return m_skymap;
+}
 
 #endif /* CTSKYMAP_HPP */

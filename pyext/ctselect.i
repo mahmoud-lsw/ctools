@@ -1,7 +1,7 @@
 /***************************************************************************
- *                    ctselect - CTA data selection tool                   *
+ *                      ctselect - Data selection tool                     *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2010-2011 by Jurgen Knodlseder                           *
+ *  copyright (C) 2010-2016 by Jurgen Knodlseder                           *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,43 +20,39 @@
  ***************************************************************************/
 /**
  * @file ctselect.i
- * @brief CTA data selection tool Python interface definition
- * @author J. Knodlseder
+ * @brief Data selection tool definition
+ * @author Juergen Knoedlseder
  */
 %{
 /* Put headers and other declarations here that are needed for compilation */
 #include "ctselect.hpp"
-#include "GTools.hpp"
 %}
 
 
 /***********************************************************************//**
  * @class ctselect
  *
- * @brief CTA data selection tool Python interface
+ * @brief Data selection tool
  ***************************************************************************/
-class ctselect : public GApplication  {
+class ctselect : public ctobservation {
 public:
     // Constructors and destructors
     ctselect(void);
-    explicit ctselect(GObservations obs);
+    explicit ctselect(const GObservations& obs);
     ctselect(int argc, char *argv[]);
     ctselect(const ctselect& app);
     virtual ~ctselect(void);
 
     // Methods
-    void           clear(void);
-    void           execute(void);
-    void           run(void);
-    void           save(void);
-    GObservations& obs(void) { return m_obs; }
-    void           get_parameters(void);
-    void           select_events(GCTAObservation* obs, const std::string& filename);
+    void clear(void);
+    void run(void);
+    void save(void);
+    void publish(const std::string& name = "");
 };
 
 
 /***********************************************************************//**
- * @brief CTA data selection tool Python extension
+ * @brief Data selection tool Python extension
  ***************************************************************************/
 %extend ctselect {
     ctselect copy() {

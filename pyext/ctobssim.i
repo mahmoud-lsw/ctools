@@ -1,7 +1,7 @@
 /***************************************************************************
- *               ctobssim - CTA observation simulation tool                *
+ *                  ctobssim - Observation simulator tool                  *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2011 by Jurgen Knodlseder                                *
+ *  copyright (C) 2011-2016 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,45 +20,41 @@
  ***************************************************************************/
 /**
  * @file ctobssim.i
- * @brief CTA observation simulation tool Python interface definition
- * @author J. Knodlseder
+ * @brief Observation simulator tool definition
+ * @author Juergen Knoedlseder
  */
 %{
 /* Put headers and other declarations here that are needed for compilation */
 #include "ctobssim.hpp"
-#include "GTools.hpp"
 %}
 
 
 /***********************************************************************//**
  * @class ctobssim
  *
- * @brief CTA data selection tool Python interface
+ * @brief Observation simulator tool
  ***************************************************************************/
-class ctobssim : public GApplication  {
+class ctobssim : public ctobservation {
 public:
     // Constructors and destructors
     ctobssim(void);
-    explicit ctobssim(GObservations obs);
+    explicit ctobssim(const GObservations& obs);
     ctobssim(int argc, char *argv[]);
     ctobssim(const ctobssim& app);
     virtual ~ctobssim(void);
 
     // Methods
-    void           clear(void);
-    void           execute(void);
-    void           run(void);
-    void           save(void);
-    GObservations& obs(void);
-    void           get_parameters(void);
-    void           set_list(GCTAObservation* obs);
-    void           simulate_source(GCTAObservation* obs, const GModels& models, GRan& ran, GLog* wrklog=NULL);
-    void           simulate_background(GCTAObservation* obs, const GModels& models, GRan& ran, GLog* wrklog=NULL);
+    void          clear(void);
+    void          run(void);
+    void          save(void);
+    void          publish(const std::string& name = "");
+    const double& max_rate(void) const;
+    void          max_rate(const double& max_rate);
 };
 
 
 /***********************************************************************//**
- * @brief CTA observation simulation tool Python extension
+ * @brief Observation simulation tool Python extension
  ***************************************************************************/
 %extend ctobssim {
     ctobssim copy() {

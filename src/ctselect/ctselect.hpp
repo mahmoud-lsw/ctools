@@ -1,7 +1,7 @@
 /***************************************************************************
- *                    ctselect - CTA data selection tool                   *
+ *                      ctselect - Data selection tool                     *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2010-2013 by Juergen Knoedlseder                         *
+ *  copyright (C) 2010-2016 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,7 +20,7 @@
  ***************************************************************************/
 /**
  * @file ctselect.hpp
- * @brief CTA data selection tool definition
+ * @brief Data selection tool definition
  * @author Juergen Knoedlseder
  */
 
@@ -32,73 +32,85 @@
 #include <string>
 #include "GammaLib.hpp"
 #include "GCTALib.hpp"
+#include "ctobservation.hpp"
 
 /* __Definitions _________________________________________________________ */
 #define CTSELECT_NAME    "ctselect"
-#define CTSELECT_VERSION "00-05-00"
+#define CTSELECT_VERSION "1.2.0"
 
 
 /***********************************************************************//**
  * @class ctselect
  *
- * @brief CTA data selection tool interface defintion.
+ * @brief Data selection tool
  ***************************************************************************/
-class ctselect : public GApplication  {
+class ctselect : public ctobservation {
+
 public:
     // Constructors and destructors
     ctselect(void);
-    explicit ctselect(GObservations obs);
+    explicit ctselect(const GObservations& obs);
     ctselect(int argc, char *argv[]);
     ctselect(const ctselect& app);
     virtual ~ctselect(void);
 
     // Operators
-    ctselect& operator= (const ctselect& app);
+    ctselect& operator=(const ctselect& app);
 
     // Methods
-    void           clear(void);
-    void           execute(void);
-    void           run(void);
-    void           save(void);
-    GObservations& obs(void) { return m_obs; }
-    void           get_parameters(void);
-    void           select_events(GCTAObservation* obs, const std::string& filename);
+    void clear(void);
+    void run(void);
+    void save(void);
+    void publish(const std::string& name = "");
 
 protected:
     // Protected methods
     void        init_members(void);
     void        copy_members(const ctselect& app);
     void        free_members(void);
-    std::string check_infile(const std::string& filename) const;
+    void        get_parameters(void);
+    void        select_events(GCTAObservation* obs,
+                              const std::string& filename,
+                              const std::string& evtname,
+                              const std::string& gtiname);
+    GEbounds    set_ebounds(GCTAObservation* obs,
+                            const GEbounds& ebounds) const;
+    std::string check_infile(const std::string& filename,
+                             const std::string& evtname) const;
     std::string set_outfile_name(const std::string& filename) const;
+    std::string get_gtiname(const std::string& filename,
+                            const std::string& evtname) const;
     void        save_fits(void);
     void        save_xml(void);
     void        save_event_list(const GCTAObservation* obs,
                                 const std::string&     infile,
+                                const std::string&     evtname,
+                                const std::string&     gtiname,
                                 const std::string&     outfile) const;
 
     // User parameters
-    std::string m_infile;     //!< Input event list or XML file
-    std::string m_outfile;    //!< Output event list or XML file
+    std::string m_outobs;     //!< Output event list or XML file
     std::string m_prefix;     //!< Prefix for multiple event lists
     bool        m_usepnt;     //!< Use pointing instead of RA/DEC parameters
-    double      m_ra;         //!< RA of ROI centre
-    double      m_dec;        //!< DEC of ROI centre
-    double      m_rad;        //!< ROI radius
+    GCTARoi     m_roi;        //!< RoI selection
     double      m_tmin;       //!< Start time
     double      m_tmax;       //!< Stop time
     double      m_emin;       //!< Lower energy
     double      m_emax;       //!< Upper energy
     std::string m_expr;       //!< Selection expression
+    std::string m_usethres;   //!< Energy threshold type
+    GChatter    m_chatter;    //!< Chattiness
 
     // Protected members
-    GObservations            m_obs;        //!< Observations container
-    std::vector<std::string> m_infiles;    //!< Input event filenames
-    GTime                    m_timemin;    //!< Earliest time
-    GTime                    m_timemax;    //!< Latest time
-    bool                     m_use_xml;    //!< Use XML file instead of FITS file
-    bool                     m_read_ahead; //!< Read ahead parameters
-    GTimeReference           m_cta_ref;    //!< CTA time reference
+    std::vector<std::string> m_infiles;       //!< Input event filenames
+    std::vector<std::string> m_evtname;       //!< Event extension names
+    std::vector<std::string> m_gtiname;       //!< GTI extension names
+    GTime                    m_timemin;       //!< Earliest time
+    GTime                    m_timemax;       //!< Latest time
+    bool                     m_select_energy; //!< Perform energy selection
+    bool                     m_select_roi;    //!< Perform RoI selection
+    bool                     m_select_time;   //!< Perform time selection
 };
+
 
 #endif /* CTSELECT_HPP */

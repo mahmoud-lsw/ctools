@@ -1,7 +1,7 @@
 /***************************************************************************
- *                     ctskymap - CTA sky mapping tool                     *
+ *                       ctskymap - Sky mapping tool                       *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2012 by Juergen Knoedlseder                              *
+ *  copyright (C) 2012-2016 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,45 +20,40 @@
  ***************************************************************************/
 /**
  * @file ctskymap.i
- * @brief CTA sky mapping tool definition
+ * @brief Sky mapping tool definition
  * @author Juergen Knoedlseder
  */
 %{
 /* Put headers and other declarations here that are needed for compilation */
 #include "ctskymap.hpp"
-#include "GTools.hpp"
 %}
 
 
 /***********************************************************************//**
  * @class ctskymap
  *
- * @brief CTA sky mapping tool interface defintion
+ * @brief Sky mapping tool
  ***************************************************************************/
-class ctskymap : public GApplication  {
+class ctskymap : public ctobservation {
 public:
     // Constructors and destructors
     ctskymap(void);
-    explicit ctskymap(GObservations obs);
+    explicit ctskymap(const GObservations& obs);
     ctskymap(int argc, char *argv[]);
     ctskymap(const ctskymap& app);
     virtual ~ctskymap(void);
 
     // Methods
     void           clear(void);
-    void           execute(void);
     void           run(void);
     void           save(void);
-    GObservations& obs(void);
-    GSkymap&       skymap(void);
-    void           get_parameters(void);
-    void           init_map(GCTAObservation* obs);
-    void           map_events(GCTAObservation* obs);
+    void           publish(const std::string& name = "");
+    const GSkyMap& skymap(void) const;
 };
 
 
 /***********************************************************************//**
- * @brief CTA sky mapping tool Python extension
+ * @brief Sky mapping tool Python extension
  ***************************************************************************/
 %extend ctskymap {
     ctskymap copy() {

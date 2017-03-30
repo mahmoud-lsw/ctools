@@ -1,7 +1,7 @@
 /***************************************************************************
- *                   ctlike - CTA maximum likelihood tool                  *
+ *                ctlike - Maximum likelihood fitting tool                 *
  * ----------------------------------------------------------------------- *
- *  copyright (C) 2010-2013 by Juergen Knoedlseder                         *
+ *  copyright (C) 2010-2016 by Juergen Knoedlseder                         *
  * ----------------------------------------------------------------------- *
  *                                                                         *
  *  This program is free software: you can redistribute it and/or modify   *
@@ -20,7 +20,7 @@
  ***************************************************************************/
 /**
  * @file ctlike.cpp
- * @brief CTA maximum likelihood tool implementation
+ * @brief Maximum likelihood fitting tool implementation
  * @author Juergen Knoedlseder
  */
 
@@ -33,7 +33,6 @@
 #include "GTools.hpp"
 
 /* __ Method name definitions ____________________________________________ */
-#define G_GET_PARAMETERS                           "ctlike::get_parameters()"
 
 /* __ Debug definitions __________________________________________________ */
 
@@ -49,13 +48,10 @@
 /***********************************************************************//**
  * @brief Void constructor
  ***************************************************************************/
-ctlike::ctlike(void) : GApplication(CTLIKE_NAME, CTLIKE_VERSION)
+ctlike::ctlike(void) : ctlikelihood(CTLIKE_NAME, CTLIKE_VERSION)
 {
     // Initialise members
     init_members();
-
-    // Write header into logger
-    log_header();
 
     // Return
     return;
@@ -65,19 +61,15 @@ ctlike::ctlike(void) : GApplication(CTLIKE_NAME, CTLIKE_VERSION)
 /***********************************************************************//**
  * @brief Observations constructor
  *
- * This method creates an instance of the class by copying an existing
- * observations container.
+ * param[in] obs Observation container.
+ *
+ * Constructs ctlike tool from an observations container.
  ***************************************************************************/
-ctlike::ctlike(GObservations obs) : GApplication(CTLIKE_NAME, CTLIKE_VERSION)
+ctlike::ctlike(const GObservations& obs) :
+        ctlikelihood(CTLIKE_NAME, CTLIKE_VERSION, obs)
 {
     // Initialise members
     init_members();
-
-    // Set observations
-    m_obs = obs;
-
-    // Write header into logger
-    log_header();
 
     // Return
     return;
@@ -89,15 +81,15 @@ ctlike::ctlike(GObservations obs) : GApplication(CTLIKE_NAME, CTLIKE_VERSION)
  *
  * @param[in] argc Number of arguments in command line.
  * @param[in] argv Array of command line arguments.
+ *
+ * Constructs an instance of the ctlike tool that will parse user parameters
+ * that are provided as command line arguments.
  ***************************************************************************/
 ctlike::ctlike(int argc, char *argv[]) : 
-                        GApplication(CTLIKE_NAME, CTLIKE_VERSION, argc, argv)
+        ctlikelihood(CTLIKE_NAME, CTLIKE_VERSION, argc, argv)
 {
     // Initialise members
     init_members();
-
-    // Write header into logger
-    log_header();
 
     // Return
     return;
@@ -109,7 +101,7 @@ ctlike::ctlike(int argc, char *argv[]) :
  *
  * @param[in] app Application.
  ***************************************************************************/
-ctlike::ctlike(const ctlike& app) : GApplication(app)
+ctlike::ctlike(const ctlike& app) : ctlikelihood(app)
 {
     // Initialise members
     init_members();
@@ -145,14 +137,15 @@ ctlike::~ctlike(void)
  * @brief Assignment operator
  *
  * @param[in] app Application.
+ * @return Application.
  ***************************************************************************/
-ctlike& ctlike::operator= (const ctlike& app)
+ctlike& ctlike::operator=(const ctlike& app)
 {
     // Execute only if object is not identical
     if (this != &app) {
 
         // Copy base class members
-        this->GApplication::operator=(app);
+        this->ctlikelihood::operator=(app);
 
         // Free members
         free_members();
@@ -177,39 +170,29 @@ ctlike& ctlike::operator= (const ctlike& app)
  ==========================================================================*/
 
 /***********************************************************************//**
- * @brief Clear instance
+ * @brief Clear ctlike tool
+ *
+ * Clears ctlike tool.
  ***************************************************************************/
 void ctlike::clear(void)
 {
     // Free members
     free_members();
-    this->GApplication::free_members();
+    this->ctlikelihood::free_members();
+    this->ctobservation::free_members();
+    this->ctool::free_members();
+
+    // Clear base class (needed to conserve tool name and version)
+    this->GApplication::clear();
 
     // Initialise members
-    this->GApplication::init_members();
+    this->ctool::init_members();
+    this->ctobservation::init_members();
+    this->ctlikelihood::init_members();
     init_members();
 
-    // Return
-    return;
-}
-
-
-/***********************************************************************//**
- * @brief Execute application
- *
- * This method performs a maximum likelihood analysis of a observation given
- * in an observation container and saves the results in an XML file.
- ***************************************************************************/
-void ctlike::execute(void)
-{
-    // Signal that some parameters should be read ahead
-    m_read_ahead = true;
-
-    // Bin the event data
-    run();
-
-    // Save the results into XML file
-    save();
+    // Write header into logger
+    log_header();
 
     // Return
     return;
@@ -235,42 +218,100 @@ void ctlike::run(void)
     // Get parameters
     get_parameters();
 
-    // Write parameters into logger
-    if (logTerse()) {
-        log_parameters();
-        log << std::endl;
-    }
+    // Set energy dispersion flags of all CTA observations and save old
+    // values in save_edisp vector
+    std::vector<bool> save_edisp = set_edisp(m_obs, m_apply_edisp);
 
-    // Write observation(s) into logger
-    if (logTerse()) {
-        log << std::endl;
-        if (m_obs.size() > 1) {
-            log.header1("Observations");
-        }
-        else {
-            log.header1("Observation");
-        }
-        log << m_obs << std::endl;
-    }
+    // Write input observation container into logger
+    log_observations(NORMAL, m_obs, "Input observation");
 
     // Optimize model parameters using LM optimizer
     optimize_lm();
 
+    // Store copy of curvature matrix
+    GMatrixSparse curvature =
+        *(const_cast<GObservations::likelihood&>(m_obs.function()).curvature());
+    
+    // Store Npred
+    double npred = m_obs.npred();
+    
+    // Store models for which TS should be computed
+    std::vector<std::string> ts_srcs;
+    GModels models_orig = m_obs.models();
+    for (int i = 0; i < models_orig.size(); ++i) {
+        GModel* model = models_orig[i];
+        if (model->tscalc()) {
+            ts_srcs.push_back(model->name());
+        }
+    }
+
+    // Compute TS values if requested
+    if (!ts_srcs.empty()) {
+
+        // Store original maximum likelihood and models
+        double  logL_src = m_logL;
+        GModels models   = m_obs.models();
+
+        // Fix spatial parameters if requested
+        if (m_fix_spat_for_ts) {
+
+            // Loop over all models
+            for (int i = 0; i < models.size(); ++i) {
+
+                // Continue only if model is skymodel
+                GModelSky* sky= dynamic_cast<GModelSky*>(models[i]);
+                if (sky != NULL) {
+
+                    // Fix spatial parameters
+                    GModelSpatial* spatial = sky->spatial();
+                    for (int j = 0; j < spatial->size(); j++) {
+                        (*spatial)[j].fix();
+                    } // endfor: looped over spatial parameters
+
+                } // endif: there was a sky model
+
+            } // endfor: looped over models
+
+        } // endif: spatial parameter should be fixed
+
+        // Loop over stored models, remove source and refit
+        for (int i = 0; i < ts_srcs.size(); ++i) {
+            models.remove(ts_srcs[i]);
+            m_obs.models(models);    
+            double logL_nosrc = reoptimize_lm();
+            double ts         = 2.0 * (logL_src-logL_nosrc);
+            models_orig[ts_srcs[i]]->ts(ts);
+            models = models_orig;
+        }
+
+        // Restore best fit values
+        m_obs.models(models_orig);
+    }
+
     // Compute number of observed events in all observations
     double num_events = 0.0;
     for (int i = 0; i < m_obs.size(); ++i) {
-        num_events += m_obs[i]->events()->number();
+        double data = m_obs[i]->events()->number();
+        if (data >= 0.0) {
+            num_events += data;
+        }
     }
 
     // Write results into logger
-    if (logTerse()) {
-        log << parformat("Maximum log likelihood") << m_logL << std::endl;
-        log << parformat("Observed events  (Nobs)") << num_events << std::endl;
-        log << parformat("Predicted events (Npred)") << m_obs.npred();
-        log << " (Nobs - Npred = " << num_events-m_obs.npred();
-        log << ")" << std::endl;
-        log << m_obs.models() << std::endl;
-    }
+    log_header1(NORMAL, "Maximum likelihood optimisation results");
+    log_string(NORMAL, m_opt.print(m_chatter));
+    log_value(NORMAL, "Maximum log likelihood", gammalib::str(m_logL,3));
+    log_value(NORMAL, "Observed events  (Nobs)", gammalib::str(num_events,3));
+    log_value(NORMAL, "Predicted events (Npred)", gammalib::str(npred,3)+
+              " (Nobs - Npred = "+gammalib::str(num_events-npred)+")");
+    log_string(NORMAL, m_obs.models().print(m_chatter));
+
+    // Restore energy dispersion flags of all CTA observations
+    restore_edisp(m_obs, save_edisp);
+
+    // Restore curvature matrix
+    *(const_cast<GObservations::likelihood&>(m_obs.function()).curvature()) =
+        curvature;
 
     // Return
     return;
@@ -280,22 +321,48 @@ void ctlike::run(void)
 /***********************************************************************//**
  * @brief Save results
  *
- * This method saves the fit results in a XML file.
+ * This method saves the fit results into a XML file and a FITS file. If
+ * the filename parameters are "NONE", the files are not saved.
  ***************************************************************************/
 void ctlike::save(void)
 {
     // Write header
-    if (logTerse()) {
-        log << std::endl;
-        log.header1("Save results");
+    log_header1(TERSE, "Save results");
+
+    // Get output filenames
+    m_outmodel  = (*this)["outmodel"].filename();
+    m_outcovmat = (*this)["outcovmat"].filename();
+
+    // Save only if filename is valid
+    if (is_valid_filename(m_outmodel)) {
+
+        // Log filename
+        log_value(NORMAL, "Model definition file", m_outmodel.url());
+
+        // Write results out as XML model
+        m_obs.models().save(m_outmodel);
+
     }
 
-    // Get output filename
-    m_outmdl = (*this)["outmdl"].filename();
+    // ... otherwise signal that file was not saved
+    else {
+        log_value(NORMAL, "Model definition file", "NONE");
+    }
 
-    // Write results out as XML model
-    if (toupper(m_outmdl) != "NONE") {
-        m_obs.models().save(m_outmdl);
+    // Save covariance matrix if filename is valid
+    if (is_valid_filename(m_outcovmat)) {
+
+        // Log filename
+        log_value(NORMAL, "Covariance matrix file", m_outcovmat.url());
+
+        // Save covarianve matrix
+        m_obs.function().save(m_outcovmat);
+
+    }
+
+    // ... otherwise signal that no covariance matrix was not saved
+    else {
+        log_value(NORMAL, "Covariance matrix file", "NONE");
     }
 
     // Return
@@ -322,80 +389,54 @@ void ctlike::save(void)
  ***************************************************************************/
 void ctlike::get_parameters(void)
 {
-    // If there are no observations in container then add a single CTA
-    // observation using the parameters from the parameter file
-    if (m_obs.size() == 0) {
+    // Setup observations from "inobs" parameter
+    setup_observations(m_obs);
 
-        // Allocate CTA observation
-        GCTAObservation obs;
+    // If only single observation is used, read statistics parameter
+    if (!m_use_xml) {
 
-        // Get event file name
-        std::string filename = (*this)["infile"].filename();
+        // Get other task parameters
+        std::string statistics = gammalib::toupper((*this)["stat"].string());
 
-        // Try first to open as unbinned FITS file
-        try {
-
-            // Determine whether FITS file has EVENTS extension
-            GFits file(filename);
-            bool  is_unbinned = file.hashdu("EVENTS");
-            file.close();
-
-            // If FITS file has an events header then load as unbinned
-            if (is_unbinned) {
-                obs.load_unbinned(filename);
-            }
-
-            // ... otherwise load as binned
-            else {
-                obs.load_binned(filename);
-            }
-
-            // Get task parameters for event file loading
-            m_stat  = toupper((*this)["stat"].string());
-            m_caldb = (*this)["caldb"].string();
-            m_irf   = (*this)["irf"].string();
-
-            // Set statistics
-            obs.statistics(m_stat);
-
-            // Set reponse
-            obs.response(m_irf, m_caldb);
-
-            // Append observation to container
-            m_obs.append(obs);
-
-        }
-
-        // ... otherwise try to open as XML file
-        catch (GException::fits_open_error &e) {
-
-            // Load observations from XML file
-            m_obs.load(filename);
-
-        }
-
-    } // endif: there was no observation in the container
+        // Set statistics
+        (*m_obs[0]).statistics(statistics);
+    }
 
     // If there is are no models associated with the observations then
     // load now the model definition
     if (m_obs.models().size() == 0) {
 
         // Get models XML filename
-        std::string filename = (*this)["srcmdl"].filename();
+        std::string filename = (*this)["inmodel"].filename();
 
         // Setup models for optimizing.
         m_obs.models(GModels(filename));
 
     } // endif: no models were associated with observations
 
-    // Get standard parameters
-    m_refit  = (*this)["refit"].boolean();
+    // Get other parameters
+    m_refit           = (*this)["refit"].boolean();
+    m_apply_edisp     = (*this)["edisp"].boolean();
+    m_fix_spat_for_ts = (*this)["fix_spat_for_ts"].boolean();
+    m_chatter         = static_cast<GChatter>((*this)["chatter"].integer());
 
     // Optionally read ahead parameters so that they get correctly
     // dumped into the log file
-    if (m_read_ahead) {
-        m_outmdl = (*this)["outmdl"].filename();
+    if (read_ahead()) {
+        m_outmodel  = (*this)["outmodel"].filename();
+        m_outcovmat = (*this)["outcovmat"].filename();
     }
+
+    // Set optimizer logger
+    if (logNormal()) {
+        static_cast<GOptimizerLM*>(&m_opt)->logger(&log);
+    }
+    else {
+        static_cast<GOptimizerLM*>(&m_opt)->logger(NULL);
+    }
+
+    // Write parameters into logger
+    log_parameters(TERSE);
 
     // Return
     return;
@@ -403,32 +444,84 @@ void ctlike::get_parameters(void)
 
 
 /***********************************************************************//**
- * @brief Optimize model parameters using Levenberg-Marquardt method
+ * @brief Optimise model parameters
+ *
+ * Optimise model parameters using a maximum likelihood fit.
  ***************************************************************************/
 void ctlike::optimize_lm(void)
 {
-    // Free any existing optimizer
-    if (m_opt != NULL) delete m_opt;
-    m_opt = NULL;
+    // Write header
+    log_header1(TERSE, "Maximum likelihood optimisation");
+    log.indent(1);
 
-    // Allocate optimizer. The logger is only passed to the optimizer
-    // constructor if optimizer logging is requested.
-    GOptimizerLM* opt = (logTerse()) ? new GOptimizerLM(log)
-                                     : new GOptimizerLM();
-
-    // Assign optimizer
-    m_opt = opt;
-
-    // Set optimizer parameters
-    opt->max_iter(m_max_iter);
-    opt->max_stalls(m_max_stall);
-
-    // Write Header for optimization and indent for optimizer logging
-    if (logTerse()) {
-        log << std::endl;
-        log.header1("Maximum likelihood optimisation");
-        log.indent(1);
+    // Compute number of fitted parameters
+    int nfit = 0;
+    for (int i = 0; i < m_obs.models().size(); ++i) {
+        const GModel* model = m_obs.models()[i];
+        for (int k = 0; k < model->size(); ++k) {
+            if ((*model)[k].is_free()) {
+                nfit++;
+            }
+        }
     }
+
+    // Notify if all parameters are fixed
+    if (nfit == 0) {
+        log_string(TERSE, "WARNING: All model parameters are fixed!");
+        log_string(TERSE, "         ctlike will proceed without fitting parameters.");
+        log_string(TERSE, "         All curvature matrix elements will be zero.");
+    }
+
+    // Perform LM optimization
+    m_obs.optimize(m_opt);
+
+    // Optionally refit
+    if (m_refit) {
+
+        // Dump new header
+        log.indent(0);
+        log_header1(TERSE, "Maximum likelihood re-optimisation");
+        log.indent(1);
+
+        // Optimise again
+        m_obs.optimize(m_opt);
+
+    }
+
+    // Optionally show curvature matrix
+    log_header1(EXPLICIT, "Curvature matrix");
+    log.indent(1);
+    log_string(EXPLICIT, (const_cast<GObservations::likelihood&>
+                                    (m_obs.function()).curvature())->print());
+
+    // Compute errors
+    m_obs.errors(m_opt);
+
+    // Store maximum log likelihood value
+    m_logL = -(m_opt.value());
+
+    // Remove indent
+    log.indent(0);
+
+    // Return
+    return;
+}
+
+
+/***********************************************************************//**
+ * @brief Re-optimise model parameters for TS computation
+ *
+ * Re-optimise the model parameters using a maximum likelihood fit for
+ * computation of the Test Statistic value for a given source.
+ ***************************************************************************/
+double ctlike::reoptimize_lm(void)
+{
+    // Write Header for optimization and indent for optimizer logging
+    log_header1(TERSE, "Maximum likelihood re-optimisation");
+    log.indent(1);
+
+    // Create a clone of the optimizer for the re-optimisation
+    GOptimizer* opt = m_opt.clone();
 
     // Perform LM optimization
     m_obs.optimize(*opt);
@@ -439,18 +532,15 @@ void ctlike::optimize_lm(void)
     }
 
     // Store maximum log likelihood value
-    m_logL = -(opt->value());
+    double logL = -(opt->value());
 
     // Write optimization results
     log.indent(0);
-    if (logTerse()) {
-        log << std::endl;
-        log.header1("Maximum likelihood optimization results");
-        log << *opt << std::endl;
-    }
+    log_header1(NORMAL, "Maximum likelihood re-optimisation results");
+    log_string(NORMAL, opt->print(m_chatter));
 
     // Return
-    return;
+    return (logL);
 }
 
 
@@ -466,20 +556,22 @@ void ctlike::optimize_lm(void)
 void ctlike::init_members(void)
 {
     // Initialise members
-    m_stat.clear();
-    m_caldb.clear();
-    m_irf.clear();
-    m_outmdl.clear();
-    m_obs.clear();
-    m_refit      = false;
-    m_max_iter   = 100;   // Set maximum number of iterations
-    m_max_stall  = 10;    // Set maximum number of stalls
-    m_logL       = 0.0;
-    m_opt        = NULL;
-    m_read_ahead = false;
+    m_outmodel.clear();
+    m_outcovmat.clear();
+    m_refit           = false;
+    m_max_iter        = 100;   // Set maximum number of iterations
+    m_max_stall       = 10;    // Set maximum number of stalls
+    m_logL            = 0.0;
+    m_apply_edisp     = false;
+    m_fix_spat_for_ts = false;
+    m_chatter         = static_cast<GChatter>(2);
 
     // Set logger properties
     log.date(true);
+
+    // Set optimizer parameters
+    m_opt.max_iter(m_max_iter);
+    m_opt.max_stalls(m_max_stall);
 
     // Return
     return;
@@ -494,17 +586,15 @@ void ctlike::init_members(void)
 void ctlike::copy_members(const ctlike& app)
 {
     // Copy attributes
-    m_stat       = app.m_stat;
-    m_refit      = app.m_refit;
-    m_caldb      = app.m_caldb;
-    m_irf        = app.m_irf;
-    m_outmdl     = app.m_outmdl;
-    m_obs        = app.m_obs;
-    m_max_iter   = app.m_max_iter;
-    m_max_stall  = app.m_max_stall;
-    m_logL       = app.m_logL;
-    m_opt        = app.m_opt->clone();
-    m_read_ahead = app.m_read_ahead;
+    m_refit           = app.m_refit;
+    m_outmodel        = app.m_outmodel;
+    m_outcovmat       = app.m_outcovmat;
+    m_max_iter        = app.m_max_iter;
+    m_max_stall       = app.m_max_stall;
+    m_logL            = app.m_logL;
+    m_apply_edisp     = app.m_apply_edisp;
+    m_fix_spat_for_ts = app.m_fix_spat_for_ts;
+    m_chatter         = app.m_chatter;
 
     // Return
     return;
@@ -516,17 +606,6 @@ void ctlike::copy_members(const ctlike& app)
  ***************************************************************************/
 void ctlike::free_members(void)
 {
-    // Free members
-    if (m_opt != NULL) delete m_opt;
-
-    // Mark pointers as free
-    m_opt = NULL;
-
-    // Write separator into logger
-    if (logTerse()) {
-        log << std::endl;
-    }
-
     // Return
     return;
 }
